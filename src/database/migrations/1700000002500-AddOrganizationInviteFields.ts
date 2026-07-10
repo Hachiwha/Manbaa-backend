@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddOrganizationInviteFields1700000002000 implements MigrationInterface {
-  name = 'AddOrganizationInviteFields1700000002000';
+export class AddOrganizationInviteFields1700000002500 implements MigrationInterface {
+  name = 'AddOrganizationInviteFields1700000002500';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

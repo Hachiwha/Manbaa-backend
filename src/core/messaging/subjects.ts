@@ -1,5 +1,5 @@
 // ── Canonical NATS Subject Registry ──
-// Source of truth: packages/contracts/nats-subjects.json
+// Source of truth: contracts/nats-subjects.json
 // Both NestJS and FastAPI MUST reference this file.
 // Do not add subjects here without updating the canonical registry.
 
@@ -14,6 +14,7 @@ export const SUBJECTS_V2 = {
   AI_TASK_PROGRESS: 'workspace.ai.task.progress',
   AI_TASK_COMPLETED: 'workspace.ai.task.completed',
   AI_TASK_FAILED: 'workspace.ai.task.failed',
+  AI_TASK_CANCEL_REQUESTED: 'workspace.ai.task.cancel.requested',
 
   // Source / Document processing
   SOURCE_PROCESS_REQUESTED: 'workspace.source.process.requested',

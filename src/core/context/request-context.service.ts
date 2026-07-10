@@ -4,16 +4,19 @@ import { AsyncLocalStorage } from 'async_hooks';
 export interface RequestContext {
   userId?: string;
   orgId?: string;
+  organizationId?: string;
+  workspaceId?: string;
   correlationId: string;
   role?: string;
+  requestStartedAt: number;
 }
 
 @Injectable()
 export class RequestContextService {
   private static readonly als = new AsyncLocalStorage<RequestContext>();
 
-  run<T>(context: RequestContext, callback: () => T): T {
-    return RequestContextService.als.run(context, callback);
+  run<T>(context: Omit<RequestContext, 'requestStartedAt'> & { requestStartedAt?: number }, callback: () => T): T {
+    return RequestContextService.als.run({ ...context, requestStartedAt: context.requestStartedAt ?? Date.now() }, callback);
   }
 
   getStore(): RequestContext | undefined {
@@ -30,8 +33,10 @@ export class RequestContextService {
   }
 
   getOrgId(): string | undefined {
-    return this.getStore()?.orgId;
+    return this.getStore()?.organizationId ?? this.getStore()?.orgId;
   }
+  getOrganizationId(): string | undefined { return this.getOrgId(); }
+  getWorkspaceId(): string | undefined { return this.getStore()?.workspaceId; }
 
   getUserId(): string | undefined {
     return this.getStore()?.userId;

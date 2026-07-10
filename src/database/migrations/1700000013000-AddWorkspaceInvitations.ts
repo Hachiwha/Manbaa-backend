@@ -1,0 +1,6 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
+export class AddWorkspaceInvitations1700000013000 implements MigrationInterface {
+  name='AddWorkspaceInvitations1700000013000';
+  async up(q:QueryRunner){ await q.query(`CREATE TYPE workspace_invitation_status_enum AS ENUM ('pending','accepted','expired','revoked')`); await q.query(`CREATE TABLE workspace_invitation(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid NOT NULL REFERENCES organization(id),workspace_id uuid NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,email citext NOT NULL,role workspace_role_enum NOT NULL,token_hash text NOT NULL UNIQUE,invited_by uuid NOT NULL REFERENCES "user"(id),expires_at timestamptz NOT NULL,accepted_at timestamptz,revoked_at timestamptz,status workspace_invitation_status_enum NOT NULL DEFAULT 'pending',created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now())`); await q.query(`CREATE UNIQUE INDEX uq_workspace_invitation_pending ON workspace_invitation(workspace_id,email) WHERE status='pending'`); }
+  async down(q:QueryRunner){ await q.query(`DROP TABLE workspace_invitation`); await q.query(`DROP TYPE workspace_invitation_status_enum`); }
+}

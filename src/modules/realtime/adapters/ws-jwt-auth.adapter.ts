@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ServerOptions } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { RedisService } from '../../../infra/redis/redis.service';
 
 /**
  * Custom Socket.IO adapter that validates JWT on the WebSocket handshake.
@@ -19,6 +21,7 @@ export class WsJwtAuthAdapter extends IoAdapter {
   private readonly jwtService: JwtService;
   private readonly jwtSecret: string;
   private readonly devBypassAuth: boolean;
+  private readonly redis: RedisService;
 
   constructor(app: INestApplicationContext) {
     super(app);
@@ -26,6 +29,7 @@ export class WsJwtAuthAdapter extends IoAdapter {
     const configService = app.get(ConfigService);
     this.jwtSecret = configService.getOrThrow<string>('jwt.accessSecret');
     this.devBypassAuth = configService.get<boolean>('devBypassAuth', false);
+    this.redis = app.get(RedisService);
   }
 
   createIOServer(port: number, options?: ServerOptions): any {
@@ -34,6 +38,7 @@ export class WsJwtAuthAdapter extends IoAdapter {
       pingInterval: 25_000,
       pingTimeout: 60_000,
     });
+    server.adapter(createAdapter(this.redis.client, this.redis.subscriber));
 
     server.use(async (socket: any, next: (err?: Error) => void) => {
       try {

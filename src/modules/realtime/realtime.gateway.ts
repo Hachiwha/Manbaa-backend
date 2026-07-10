@@ -149,4 +149,14 @@ export class RealtimeGateway
     const roomSockets = this.server.sockets.adapter.rooms.get(room);
     return !!roomSockets && roomSockets.size > 0;
   }
+
+  async disconnectWorkspaceMember(workspaceId: string, userId: string): Promise<void> {
+    if (!this.server) return;
+    const sockets = await this.server.in(`user:${userId}`).fetchSockets();
+    for (const socket of sockets) {
+      await socket.leave(`workspace:${workspaceId}`);
+      socket.emit('workspace.access.revoked', { workspaceId });
+      socket.disconnect(true);
+    }
+  }
 }

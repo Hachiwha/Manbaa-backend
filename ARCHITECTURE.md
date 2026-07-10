@@ -1,5 +1,7 @@
 # AI Workflow Generation Platform — Full Architecture & Design System Specification
 
+> **Platform baseline v2:** multi-organization workspaces, centralized memberships, transactional AI tasks/outbox, Redis-scaled Socket.IO, workspace-scoped storage, usage reservations, notifications, platform audit, and replay-protected internal worker JWTs. Legacy project/workflow/session APIs remain temporary compatibility surfaces.
+
 > **Hackathon:** Digitalisation d'un processus métier par génération automatique de workflows à partir d'un besoin non structuré
 > **Version:** 2.0.0
 > **Stack:** Next.js · NestJS · FastAPI · Elsa Server · NATS JetStream · PostgreSQL + pgvector · Ollama

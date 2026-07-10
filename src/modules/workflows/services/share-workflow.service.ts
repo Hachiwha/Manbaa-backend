@@ -4,13 +4,13 @@ import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { Workflow } from '../entities/workflow.entity';
 
-interface ShareOptions {
+export interface ShareOptions {
   workflowId: string;
   expiresIn?: '1d' | '7d' | 'never';
   maxViews?: number;
 }
 
-interface ShareResult {
+export interface ShareResult {
   token: string;
   url: string;
   expiresAt?: Date;

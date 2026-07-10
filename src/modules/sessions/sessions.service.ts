@@ -255,7 +255,7 @@ export class SessionsService {
     }
     const saved = await this.sessionsRepository.save(session);
     if (saved.status === SessionStatus.NEEDS_RECONCILIATION) {
-      this.realtimeEvents.emitNeedsReconciliation(saved.id, '', 0);
+      this.realtimeEvents.emitNeedsReconciliation(saved.id);
     }
 
     await this.insertAuditLog(

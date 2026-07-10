@@ -17,6 +17,15 @@ export class RefreshToken {
   @Column({ type: 'boolean', default: false })
   revoked: boolean;
 
+  @Column({ type: 'uuid' })
+  familyId: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  replacedByTokenId: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  revokedAt: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

@@ -11,11 +11,27 @@ import {
   WorkflowUpdatedEvent,
 } from '../../core/messaging/events';
 import { SUBJECTS } from '../../core/messaging';
+import { assertDomainEvent, DomainEvent } from '../../core/messaging/domain-event';
 import { NatsClientService } from './nats.client';
 
 @Injectable()
 export class NatsPublisherService {
   constructor(private readonly natsClient: NatsClientService) { }
+
+  async publishDomainEvent<TPayload extends Record<string, unknown>>(
+    subject: string,
+    event: DomainEvent<TPayload>,
+  ): Promise<void> {
+    assertDomainEvent(event);
+    if (subject !== event.eventType) {
+      throw new TypeError('NATS subject must match domain event eventType');
+    }
+    await this.natsClient.publish(
+      subject,
+      event as unknown as Record<string, unknown>,
+      event.eventId,
+    );
+  }
 
   async publishAiTaskNew(payload: AiTaskNewEvent): Promise<void> {
     await this.natsClient.publish(

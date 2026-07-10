@@ -24,6 +24,15 @@ import { SessionsModule } from './modules/sessions/sessions.module';
 import { SkillsModule } from './modules/skills/skills.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { NatsModule } from './infra/nats/nats.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { WorkspacesModule } from './modules/workspaces/workspaces.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { UsageModule } from './modules/usage/usage.module';
+import { JobsModule } from './modules/jobs/jobs.module';
+import { OutboxModule } from './modules/outbox/outbox.module';
+import { RedisModule } from './infra/redis/redis.module';
+import { WorkspaceStorageModule } from './infra/storage/workspace-storage.module';
+import { InternalAuthModule } from './core/internal-auth/internal-auth.module';
 
 @Module({
   imports: [
@@ -33,6 +42,9 @@ import { NatsModule } from './infra/nats/nats.module';
       validationSchema: envSchema,
     }),
     LoggerModule,
+    RedisModule,
+    WorkspaceStorageModule,
+    InternalAuthModule,
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => [
@@ -56,6 +68,12 @@ import { NatsModule } from './infra/nats/nats.module';
       }),
     }),
     CoreModule,
+    AuthModule,
+    WorkspacesModule,
+    NotificationsModule,
+    UsageModule,
+    OutboxModule,
+    JobsModule,
     HealthModule,
     DocumentsModule,
     MessagesModule,

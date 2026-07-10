@@ -10,12 +10,14 @@ export default () => ({
     user: process.env.NATS_USER,
     password: process.env.NATS_PASSWORD,
   },
+  redis: { url: process.env.REDIS_URL, connectTimeoutMs: parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS,10)||5000, keyPrefix: process.env.REDIS_KEY_PREFIX||'platform:' },
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET,
     refreshSecret: process.env.JWT_REFRESH_SECRET,
     accessTtl: process.env.JWT_ACCESS_TTL,
     refreshTtl: process.env.JWT_REFRESH_TTL,
   },
+  internalAuth: { issuer: process.env.INTERNAL_AUTH_ISSUER||'nestjs-platform', audience: process.env.INTERNAL_AUTH_AUDIENCE||'fastapi-workers', currentSecret: process.env.INTERNAL_AUTH_SECRET, previousSecret: process.env.INTERNAL_AUTH_PREVIOUS_SECRET, allowedServices:(process.env.INTERNAL_AUTH_ALLOWED_SERVICES||'ai-orchestrator,document-worker,research-worker,media-worker,export-worker').split(',') },
   minio: {
     endpoint: process.env.MINIO_ENDPOINT,
     port: parseInt(process.env.MINIO_PORT, 10) || 9000,

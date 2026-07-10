@@ -10,6 +10,8 @@ import { MinIOHealthIndicator } from './indicators/minio.health';
 import { NatsHealthIndicator } from './indicators/nats.health';
 import { ElsaHealthIndicator } from './indicators/elsa.health';
 import { PgVectorHealthIndicator } from './indicators/pgvector.health';
+import { RedisService } from '../../infra/redis/redis.service';
+import { WorkerHeartbeatService } from './worker-heartbeat.service';
 
 interface HealthStatus {
   status: 'ok' | 'degraded' | 'down';
@@ -41,7 +43,20 @@ export class HealthService implements OnModuleInit {
     private readonly natsHealthIndicator: NatsHealthIndicator,
     private readonly elsaHealthIndicator: ElsaHealthIndicator,
     private readonly pgVectorHealthIndicator: PgVectorHealthIndicator,
+    private readonly redisService: RedisService,
+    private readonly workerHeartbeats: WorkerHeartbeatService,
   ) {}
+
+  live() { return { status: 'ok' as const, timestamp: new Date().toISOString() }; }
+
+  async ready() {
+    const [postgres, nats, redis, minio] = await Promise.all([
+      this.checkPostgres(), this.natsHealthIndicator.check(), this.redisService.health().catch(error => ({ status: 'down', error: error.message })), this.minIOHealthIndicator.check(),
+    ]);
+    const dependencies = { postgres, nats: nats.details.nats, redis, minio: minio.details.minio };
+    const down = Object.values(dependencies).some((item: any) => item.status === 'down');
+    return { status: down ? 'down' as const : 'ok' as const, dependencies, timestamp: new Date().toISOString() };
+  }
 
   async onModuleInit(): Promise<void> {
     // Subscribe to system.health.ping NATS topic
@@ -106,6 +121,8 @@ export class HealthService implements OnModuleInit {
       ollamaResult,
       fastAPIResult,
       elsaResult,
+      redisResult,
+      workers,
     ] = await Promise.all([
       this.checkPostgres(),
       this.pgVectorHealthIndicator.check(),
@@ -114,6 +131,8 @@ export class HealthService implements OnModuleInit {
       this.ollamaHealthIndicator.check(),
       this.fastAPIHealthIndicator.check(),
       this.elsaHealthIndicator.check(),
+      this.redisService.health().catch(error => ({ status: 'down', latency_ms: 0, error: error.message })),
+      this.workerHeartbeats.listWorkerHealth(),
     ]);
 
     return {
@@ -124,6 +143,8 @@ export class HealthService implements OnModuleInit {
       ollama: { status: this.mapStatus(ollamaResult.details.ollama.status), latency_ms: ollamaResult.details.ollama.latency_ms, models_loaded: ollamaResult.details.ollama.models_loaded, error: ollamaResult.details.ollama.error },
       fastapi: { status: this.mapStatus(fastAPIResult.details.fastapi.status), latency_ms: fastAPIResult.details.fastapi.latency_ms, error: fastAPIResult.details.fastapi.error },
       elsa: { status: this.mapStatus(elsaResult.details.elsa.status), latency_ms: elsaResult.details.elsa.latency_ms, error: elsaResult.details.elsa.error },
+      redis: { status: this.mapStatus(redisResult.status), latency_ms: redisResult.latency_ms, error: 'error' in redisResult ? redisResult.error : undefined },
+      ...Object.fromEntries(workers.map((worker: any) => [`worker:${worker.workerType}`, { ...worker, status: worker.status === 'healthy' ? 'ok' : worker.status === 'degraded' || worker.status === 'stale' ? 'degraded' : 'down' }])),
     };
   }
 

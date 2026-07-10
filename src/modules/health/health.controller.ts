@@ -17,6 +17,9 @@ export class HealthController {
     return this.healthService.checkHealth();
   }
 
+  @Public() @Get('live') live() { return this.healthService.live(); }
+  @Public() @Get('ready') ready() { return this.healthService.ready(); }
+
   @Roles('Admin')
   @Get('details')
   @HttpCode(HttpStatus.OK)

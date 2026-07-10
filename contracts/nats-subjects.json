@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "schemaVersion": 1,
+  "subjects": [
+    "workspace.ai.task.requested", "workspace.ai.task.started", "workspace.ai.task.progress", "workspace.ai.task.completed", "workspace.ai.task.failed", "workspace.ai.task.cancel.requested",
+    "workspace.source.process.requested", "workspace.source.processing", "workspace.source.extracted", "workspace.source.indexed", "workspace.source.failed",
+    "workspace.research.requested", "workspace.research.progress", "workspace.research.completed", "workspace.research.failed",
+    "workspace.canvas.analyze.requested", "workspace.canvas.analysis.completed",
+    "workspace.concept.generate.requested", "workspace.concept.generated", "workspace.concept.evaluate.requested", "workspace.concept.evaluated",
+    "workspace.export.requested", "workspace.export.progress", "workspace.export.completed", "workspace.export.failed",
+    "worker.heartbeat", "worker.health.changed"
+  ],
+  "compatibility": {
+    "ai.tasks.new": "workspace.ai.task.requested", "ai.tasks.progress": "workspace.ai.task.progress", "ai.tasks.complete": "workspace.ai.task.completed",
+    "ai.tasks.error": "workspace.ai.task.failed", "ai.tasks.result": "workspace.ai.task.completed", "ai.context.load": "workspace.ai.task.requested",
+    "document.preprocess": "workspace.source.process.requested", "document.preprocess.result": "workspace.source.extracted",
+    "workflow.events.updated": "workspace.canvas.analysis.completed", "session.events.finalized": "workspace.ai.task.completed"
+  }
+}

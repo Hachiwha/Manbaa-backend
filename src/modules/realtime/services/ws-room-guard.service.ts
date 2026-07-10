@@ -6,6 +6,9 @@ import { Socket } from 'socket.io';
 import { Session } from '../../sessions/entities/session.entity';
 import { Workflow } from '../../workflows/entities/workflow.entity';
 import { PipelineExecution } from '../../agents/entities/pipeline-execution.entity';
+import { WorkspaceMember, WorkspaceMemberStatus } from '../../workspaces/entities/workspace-member.entity';
+import { OrganizationMember } from '../../organizations/entities/organization-member.entity';
+import { AiTask } from '../../jobs/entities/ai-task.entity';
 
 export interface RoomJoinResult {
   allowed: boolean;
@@ -39,6 +42,9 @@ export class WsRoomGuardService {
     private readonly workflowsRepo: Repository<Workflow>,
     @InjectRepository(PipelineExecution)
     private readonly pipelineRepo: Repository<PipelineExecution>,
+    @InjectRepository(WorkspaceMember) private readonly workspaceMembers?: Repository<WorkspaceMember>,
+    @InjectRepository(OrganizationMember) private readonly organizationMembers?: Repository<OrganizationMember>,
+    @InjectRepository(AiTask) private readonly aiTasks?: Repository<AiTask>,
   ) {}
 
   async canJoin(socket: Socket, room: string): Promise<RoomJoinResult> {
@@ -57,6 +63,24 @@ export class WsRoomGuardService {
         return { allowed: false, reason: 'Cannot join another user\'s room' };
       }
       return { allowed: true };
+    }
+
+    if (room.startsWith('organization:')) {
+      const organizationId=room.slice('organization:'.length);
+      const allowed=await this.organizationMembers?.exist({where:{organizationId,userId:user.userId,active:true}});
+      return allowed?{allowed:true}:{allowed:false,reason:'Organization access denied'};
+    }
+
+    if (room.startsWith('workspace:') || room.startsWith('canvas:')) {
+      const workspaceId=room.slice(room.indexOf(':')+1);
+      return this.validateWorkspaceMember(user.userId,workspaceId);
+    }
+
+    if (room.startsWith('ai-task:')) {
+      const taskId=room.slice('ai-task:'.length);
+      const task=await this.aiTasks?.findOne({where:{id:taskId},select:['id','workspaceId']});
+      if(!task)return{allowed:false,reason:'AI task not found'};
+      return this.validateWorkspaceMember(user.userId,task.workspaceId);
     }
 
     // ── session:{sessionId} — org-scoped ──
@@ -174,4 +198,5 @@ export class WsRoomGuardService {
       `Room join rejected: userId=${userId ?? 'unknown'} room=${room} reason="${reason}"`,
     );
   }
+  private async validateWorkspaceMember(userId:string,workspaceId:string):Promise<RoomJoinResult>{const allowed=await this.workspaceMembers?.exist({where:{userId,workspaceId,status:WorkspaceMemberStatus.ACTIVE}});return allowed?{allowed:true}:{allowed:false,reason:'Workspace access denied'};}
 }

@@ -3,7 +3,7 @@ import {
   SessionMode,
   AgentType,
   LogLevel,
-} from '../database/enums';
+} from '../../database/enums';
 import { NatsPublisherService } from './nats.publisher.service';
 
 describe('NatsPublisherService', () => {
@@ -33,6 +33,37 @@ describe('NatsPublisherService', () => {
       expect.objectContaining({ task_type: PipelineTaskType.FULL_PIPELINE }),
       '11111111-1111-4111-8111-111111111111:ai.tasks.new:44444444-4444-4444-8444-444444444444',
     );
+  });
+
+  it('publishes canonical envelopes using eventId for JetStream deduplication', async () => {
+    const event = {
+      schemaVersion: 1,
+      eventId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      eventType: 'workspace.ai.task.requested',
+      organizationId: '11111111-1111-4111-8111-111111111111',
+      workspaceId: '22222222-2222-4222-8222-222222222222',
+      userId: '33333333-3333-4333-8333-333333333333',
+      correlationId: '44444444-4444-4444-8444-444444444444',
+      timestamp: '2026-07-09T12:00:00.000Z',
+      payload: { taskId: '55555555-5555-4555-8555-555555555555' },
+    };
+    await service.publishDomainEvent(event.eventType, event);
+    expect(natsClient.publish).toHaveBeenCalledWith(event.eventType, event, event.eventId);
+  });
+
+  it('rejects publishing an envelope on a mismatched subject', async () => {
+    await expect(
+      service.publishDomainEvent('workspace.ai.task.failed', {
+        schemaVersion: 1,
+        eventId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        eventType: 'workspace.ai.task.completed',
+        organizationId: '11111111-1111-4111-8111-111111111111',
+        userId: '33333333-3333-4333-8333-333333333333',
+        correlationId: '44444444-4444-4444-8444-444444444444',
+        timestamp: '2026-07-09T12:00:00.000Z',
+        payload: {},
+      }),
+    ).rejects.toThrow('subject must match');
   });
 
   it('publishes workflow update events', async () => {

@@ -1,5 +1,7 @@
 # ppp-backend — Process Elicitation API
 
+The platform exposes versioned authentication, multi-organization workspaces, centralized permissions, invitations, persistent AI tasks, transactional NATS outbox delivery, notifications, quotas, Redis-scaled realtime, workspace-aware MinIO storage, and replay-protected worker authentication. See `docs/PLATFORM_INTEGRATION.md` and the Developer 2/3 guides.
+
 NestJS + TypeORM + PostgreSQL/pgvector backend for the PPP platform.
 
 ## Tech Stack

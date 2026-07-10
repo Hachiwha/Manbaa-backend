@@ -10,6 +10,7 @@ const validEnv = {
   JWT_REFRESH_SECRET: 'refresh-secret-with-at-least-32-chars',
   JWT_ACCESS_TTL: '15m',
   JWT_REFRESH_TTL: '7d',
+  INTERNAL_AUTH_SECRET: 'internal-secret-with-at-least-32-chars',
   MINIO_ENDPOINT: 'localhost',
   MINIO_PORT: 9000,
   MINIO_USE_SSL: false,

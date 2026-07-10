@@ -1,0 +1,3 @@
+import { IsEnum, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+export enum AiTaskType { CHAT='chat',BRIEF_GENERATE='brief.generate',BRIEF_UPDATE='brief.update',RESEARCH_MARKET='research.market',RESEARCH_COMPETITORS='research.competitors',STRATEGY_GENERATE='strategy.generate',DIRECTION_GENERATE='direction.generate',PROMPT_ENHANCE='prompt.enhance',CANVAS_ANALYZE='canvas.analyze',CONCEPT_EVALUATE='concept.evaluate',BRAND_SYSTEM_PLAN='brand-system.plan' }
+export class CreateAiTaskDto { @IsEnum(AiTaskType) taskType:AiTaskType; @IsObject() payload:Record<string,unknown>; @IsOptional() @IsString() @MaxLength(160) idempotencyKey?:string; }

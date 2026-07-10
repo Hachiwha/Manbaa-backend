@@ -1,0 +1,1 @@
+import{Module}from'@nestjs/common';import{TypeOrmModule}from'@nestjs/typeorm';import{OrganizationUsage,UsageReservation,WorkspaceUsage}from'./entities/usage.entity';import{UsageService}from'./usage.service';@Module({imports:[TypeOrmModule.forFeature([OrganizationUsage,WorkspaceUsage,UsageReservation])],providers:[UsageService],exports:[UsageService]})export class UsageModule{}

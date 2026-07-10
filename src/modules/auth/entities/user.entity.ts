@@ -40,6 +40,18 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   lockedUntil: Date | null;
 
+  @Column({ type: 'text', nullable: true })
+  passwordResetTokenHash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetExpiresAt: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  emailVerificationTokenHash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  emailVerificationExpiresAt: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

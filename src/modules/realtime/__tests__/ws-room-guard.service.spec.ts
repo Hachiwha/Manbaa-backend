@@ -6,6 +6,9 @@ import { WsRoomGuardService } from '../services/ws-room-guard.service';
 import { Session } from '../../sessions/entities/session.entity';
 import { Workflow } from '../../workflows/entities/workflow.entity';
 import { PipelineExecution } from '../../agents/entities/pipeline-execution.entity';
+import { WorkspaceMember } from '../../workspaces/entities/workspace-member.entity';
+import { OrganizationMember } from '../../organizations/entities/organization-member.entity';
+import { AiTask } from '../../jobs/entities/ai-task.entity';
 
 function mockSocket(data: Record<string, unknown>): Socket {
   return { id: 'test-socket', data } as unknown as Socket;
@@ -24,6 +27,9 @@ describe('WsRoomGuardService', () => {
         { provide: getRepositoryToken(Session), useValue: { findOne: jest.fn() } },
         { provide: getRepositoryToken(Workflow), useValue: { findOne: jest.fn() } },
         { provide: getRepositoryToken(PipelineExecution), useValue: { findOne: jest.fn() } },
+        { provide: getRepositoryToken(WorkspaceMember), useValue: { findOne: jest.fn(), exist: jest.fn() } },
+        { provide: getRepositoryToken(OrganizationMember), useValue: { exist: jest.fn() } },
+        { provide: getRepositoryToken(AiTask), useValue: { findOne: jest.fn() } },
       ],
     }).compile();
 

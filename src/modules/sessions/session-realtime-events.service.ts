@@ -11,8 +11,8 @@ export class SessionRealtimeEventsService {
 
   emitNeedsReconciliation(
     sessionId: string,
-    reportId: string,
-    similarityScore: number,
+    reportId = '',
+    similarityScore = 0,
   ): void {
     this.logger.log({
       sessionId,

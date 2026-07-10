@@ -12,6 +12,9 @@ import { RealtimeGateway } from './realtime.gateway';
 import { WsRoomGuardService } from './services/ws-room-guard.service';
 import { NatsWsBridgeService } from './services/nats-ws-bridge.service';
 import { RealtimeEmitterService } from './services/realtime-emitter.service';
+import { WorkspaceMember } from '../workspaces/entities/workspace-member.entity';
+import { OrganizationMember } from '../organizations/entities/organization-member.entity';
+import { AiTask } from '../jobs/entities/ai-task.entity';
 
 @Module({
   imports: [
@@ -22,7 +25,7 @@ import { RealtimeEmitterService } from './services/realtime-emitter.service';
       }),
     }),
     NatsModule,
-    TypeOrmModule.forFeature([Session, Workflow, PipelineExecution, Document]),
+    TypeOrmModule.forFeature([Session, Workflow, PipelineExecution, Document, WorkspaceMember, OrganizationMember, AiTask]),
   ],
   providers: [
     RealtimeGateway,

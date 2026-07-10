@@ -1,0 +1,1 @@
+import{Global,Module}from'@nestjs/common';import{WorkspaceStorageService}from'./workspace-storage.service';@Global()@Module({providers:[WorkspaceStorageService],exports:[WorkspaceStorageService]})export class WorkspaceStorageModule{}

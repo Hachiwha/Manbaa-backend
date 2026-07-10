@@ -10,6 +10,7 @@ import { ElsaHealthIndicator } from './indicators/elsa.health';
 import { PgVectorHealthIndicator } from './indicators/pgvector.health';
 import { NatsModule } from '../../infra/nats/nats.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { WorkerHeartbeatService } from './worker-heartbeat.service';
 
 @Module({
   imports: [TerminusModule, NatsModule, RealtimeModule],
@@ -22,6 +23,8 @@ import { RealtimeModule } from '../realtime/realtime.module';
     NatsHealthIndicator,
     ElsaHealthIndicator,
     PgVectorHealthIndicator,
+    WorkerHeartbeatService,
   ],
+  exports: [HealthService, WorkerHeartbeatService],
 })
 export class HealthModule {}

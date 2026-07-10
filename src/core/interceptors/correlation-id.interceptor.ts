@@ -35,8 +35,11 @@ export class CorrelationIdInterceptor implements NestInterceptor {
     return this.requestContext.run(
       {
         correlationId,
+        requestStartedAt: Date.now(),
         userId: user?.id ?? user?.sub,
         orgId: user?.orgId ?? user?.org_id,
+        organizationId: user?.orgId ?? user?.org_id,
+        workspaceId: request.params?.workspaceId,
         role: user?.role,
       },
       () => next.handle(),

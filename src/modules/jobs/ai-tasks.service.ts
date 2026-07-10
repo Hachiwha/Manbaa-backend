@@ -1,0 +1,22 @@
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
+import { DataSource, Repository } from 'typeorm';
+import { RequestContextService } from '../../core/context/request-context.service';
+import { createDomainEvent } from '../../core/messaging/domain-event';
+import { PlatformAuditService } from '../audit/platform-audit.service';
+import { OutboxService } from '../outbox/outbox.service';
+import { UsageDimension } from '../usage/entities/usage.entity';
+import { UsageService } from '../usage/usage.service';
+import { WorkspaceRole } from '../workspaces/entities/workspace-member.entity';
+import { WorkspacePermissionService } from '../workspaces/workspace-permission.service';
+import { CreateAiTaskDto } from './dto/ai-task.dto';
+import { AiTask, JobStatus } from './entities/ai-task.entity';
+@Injectable()
+export class AiTasksService {
+  constructor(@InjectRepository(AiTask) private readonly tasks:Repository<AiTask>,private readonly dataSource:DataSource,private readonly permissions:WorkspacePermissionService,private readonly usage:UsageService,private readonly outbox:OutboxService,private readonly audit:PlatformAuditService,private readonly context:RequestContextService){}
+  async create(workspaceId:string,dto:CreateAiTaskDto,userId:string){const member=await this.permissions.requireRole(userId,workspaceId,[WorkspaceRole.OWNER,WorkspaceRole.ADMIN,WorkspaceRole.EDITOR]);const key=dto.idempotencyKey??randomUUID();const existing=await this.tasks.findOne({where:{idempotencyKey:key,workspaceId,userId}});if(existing)return existing;const correlationId=this.context.getCorrelationId();const task=await this.dataSource.transaction(async m=>{const reservation=await this.usage.reserveUsage({organizationId:member.organizationId,workspaceId,dimension:UsageDimension.AI_INPUT_TOKENS,amount:1,idempotencyKey:`ai-task:${key}`},m);const saved=await m.save(m.create(AiTask,{organizationId:member.organizationId,workspaceId,userId,taskType:dto.taskType,status:JobStatus.QUEUED,progress:0,currentStep:null,requestPayload:dto.payload,resultPayload:null,errorCode:null,errorMessage:null,correlationId,idempotencyKey:key,usageReservationId:reservation.id,startedAt:null,completedAt:null,cancelledAt:null}));const envelope=createDomainEvent({eventType:'workspace.ai.task.requested',organizationId:member.organizationId,workspaceId,userId,correlationId,payload:{taskId:saved.id,taskType:saved.taskType,requestPayload:saved.requestPayload}});await this.outbox.create(m,{aggregateType:'ai_task',aggregateId:saved.id,eventType:envelope.eventType,payload:envelope as unknown as Record<string,unknown>,correlationId});return saved});await this.audit.createAuditLog({organizationId:task.organizationId,workspaceId,actorId:userId,action:'ai_task.created',entityType:'ai_task',entityId:task.id,after:{status:task.status,taskType:task.taskType},correlationId});return task}
+  async list(workspaceId:string,userId:string){await this.permissions.requireMember(userId,workspaceId);return this.tasks.find({where:{workspaceId},order:{createdAt:'DESC'}})}
+  async get(workspaceId:string,id:string,userId:string){await this.permissions.requireMember(userId,workspaceId);const task=await this.tasks.findOne({where:{id,workspaceId}});if(!task)throw new NotFoundException('AI task not found');return task}
+  async cancel(workspaceId:string,id:string,userId:string){await this.permissions.requireRole(userId,workspaceId,[WorkspaceRole.OWNER,WorkspaceRole.ADMIN,WorkspaceRole.EDITOR]);const correlationId=this.context.getCorrelationId();const task=await this.dataSource.transaction(async m=>{const locked=await m.findOne(AiTask,{where:{id,workspaceId},lock:{mode:'pessimistic_write'}});if(!locked)throw new NotFoundException('AI task not found');if(locked.status===JobStatus.CANCELLED)return locked;if(![JobStatus.QUEUED,JobStatus.RUNNING,JobStatus.WAITING_FOR_USER].includes(locked.status))throw new ConflictException('AI task cannot be cancelled');locked.status=JobStatus.CANCELLED;locked.cancelledAt=new Date();await m.save(locked);await this.usage.releaseUsage(locked.usageReservationId,m);const envelope=createDomainEvent({eventType:'workspace.ai.task.cancel.requested',organizationId:locked.organizationId,workspaceId,userId,correlationId,payload:{taskId:locked.id}});await this.outbox.create(m,{aggregateType:'ai_task',aggregateId:locked.id,eventType:envelope.eventType,payload:envelope as never,correlationId});return locked});return task}
+}
