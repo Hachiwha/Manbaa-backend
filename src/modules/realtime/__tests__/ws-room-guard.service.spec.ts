@@ -2,10 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Socket } from 'socket.io';
 
-import { WsRoomGuardService } from '../services/ws-room-guard.service';
-import { Session } from '../../sessions/entities/session.entity';
-import { Workflow } from '../../workflows/entities/workflow.entity';
-import { PipelineExecution } from '../../agents/entities/pipeline-execution.entity';
+import { WsRoomGuardService } from "../services/ws-room-guard.service";
+import { Canvas } from "../../canvas/entities/canvas.entity";
+import { Session } from "../../sessions/entities/session.entity";
+import { Workflow } from "../../workflows/entities/workflow.entity";
+import { PipelineExecution } from "../../agents/entities/pipeline-execution.entity";
 
 function mockSocket(data: Record<string, unknown>): Socket {
   return { id: 'test-socket', data } as unknown as Socket;
@@ -13,6 +14,7 @@ function mockSocket(data: Record<string, unknown>): Socket {
 
 describe('WsRoomGuardService', () => {
   let guard: WsRoomGuardService;
+  let canvasRepo: { findOne: jest.Mock };
   let sessionsRepo: { findOne: jest.Mock };
   let workflowsRepo: { findOne: jest.Mock };
   let pipelineRepo: { findOne: jest.Mock };
@@ -21,6 +23,7 @@ describe('WsRoomGuardService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WsRoomGuardService,
+        { provide: getRepositoryToken(Canvas), useValue: { findOne: jest.fn() } },
         { provide: getRepositoryToken(Session), useValue: { findOne: jest.fn() } },
         { provide: getRepositoryToken(Workflow), useValue: { findOne: jest.fn() } },
         { provide: getRepositoryToken(PipelineExecution), useValue: { findOne: jest.fn() } },
@@ -28,6 +31,7 @@ describe('WsRoomGuardService', () => {
     }).compile();
 
     guard = module.get(WsRoomGuardService);
+    canvasRepo = module.get(getRepositoryToken(Canvas));
     sessionsRepo = module.get(getRepositoryToken(Session));
     workflowsRepo = module.get(getRepositoryToken(Workflow));
     pipelineRepo = module.get(getRepositoryToken(PipelineExecution));
@@ -41,8 +45,42 @@ describe('WsRoomGuardService', () => {
     expect(result.allowed).toBe(true);
   });
 
-  it('should reject joining another user room', async () => {
-    const result = await guard.canJoin(mockSocket({ userId: 'u1', orgId: 'o1', role: 'viewer' }), 'user:u2');
+  it("should reject joining another user room", async () => {
+    const result = await guard.canJoin(
+      mockSocket({ userId: "u1", orgId: "o1", role: "viewer" }),
+      "user:u2",
+    );
+    expect(result.allowed).toBe(false);
+  });
+
+  // ── canvas room ──
+  it("should allow canvas room when org matches", async () => {
+    canvasRepo.findOne.mockResolvedValue({ id: "c1", workflowId: "w1" });
+    workflowsRepo.findOne.mockResolvedValue({ id: "w1" });
+    const result = await guard.canJoin(
+      mockSocket({ userId: "u1", orgId: "o1", role: "viewer" }),
+      "canvas:c1",
+    );
+    expect(result.allowed).toBe(true);
+  });
+
+  it("should reject canvas room for cross-org", async () => {
+    canvasRepo.findOne.mockResolvedValue({ id: "c1", workflowId: "w1" });
+    workflowsRepo.findOne.mockResolvedValue(null); // org mismatch
+    const result = await guard.canJoin(
+      mockSocket({ userId: "u1", orgId: "org-b", role: "viewer" }),
+      "canvas:c1",
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain("organization");
+  });
+
+  it("should reject canvas room when canvas not found", async () => {
+    canvasRepo.findOne.mockResolvedValue(null);
+    const result = await guard.canJoin(
+      mockSocket({ userId: "u1", orgId: "o1", role: "viewer" }),
+      "canvas:bad",
+    );
     expect(result.allowed).toBe(false);
   });
 

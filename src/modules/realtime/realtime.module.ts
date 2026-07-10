@@ -3,9 +3,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { NatsModule } from '../../infra/nats/nats.module';
-import { Session } from '../sessions/entities/session.entity';
-import { Workflow } from '../workflows/entities/workflow.entity';
+import { NatsModule } from "../../infra/nats/nats.module";
+import { Canvas } from "../canvas/entities/canvas.entity";
+import { Session } from "../sessions/entities/session.entity";
+import { Workflow } from "../workflows/entities/workflow.entity";
 import { PipelineExecution } from '../agents/entities/pipeline-execution.entity';
 import { Document } from '../documents/entities/document.entity';
 import { RealtimeGateway } from './realtime.gateway';
@@ -22,7 +23,7 @@ import { RealtimeEmitterService } from './services/realtime-emitter.service';
       }),
     }),
     NatsModule,
-    TypeOrmModule.forFeature([Session, Workflow, PipelineExecution, Document]),
+    TypeOrmModule.forFeature([Canvas, Session, Workflow, PipelineExecution, Document]),
   ],
   providers: [
     RealtimeGateway,

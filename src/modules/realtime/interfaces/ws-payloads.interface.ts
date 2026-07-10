@@ -140,6 +140,65 @@ export interface NotificationReviewRequestPayload {
   by_user_id: string;
 }
 
+// ─── Canvas ──────────────────────────────────────────────────────────
+
+export interface CanvasObjectCreatedPayload {
+  canvas_id: string;
+  workflow_id: string;
+  object_id: string;
+  type: string;
+  label: string | null;
+  position_x: number;
+  position_y: number;
+}
+
+export interface CanvasObjectUpdatedPayload {
+  canvas_id: string;
+  workflow_id: string;
+  object_id: string;
+  label: string | null;
+  position_x: number;
+  position_y: number;
+  width: number | null;
+  height: number | null;
+}
+
+export interface CanvasObjectMovedPayload {
+  canvas_id: string;
+  workflow_id: string;
+  object_id: string;
+  position_x: number;
+  position_y: number;
+}
+
+export interface CanvasObjectDeletedPayload {
+  canvas_id: string;
+  workflow_id: string;
+  object_id: string;
+}
+
+export interface CanvasCommittedPayload {
+  canvas_id: string;
+  workflow_id: string;
+  version_id: string;
+  workflow_version_id: string;
+  version_number: number;
+}
+
+export interface CanvasCursorPayload {
+  canvas_id: string;
+  user_id: string;
+  position_x: number;
+  position_y: number;
+  selected_object_ids: string[];
+}
+
+export interface CanvasPresencePayload {
+  canvas_id: string;
+  user_id: string;
+  connection_count: number;
+}
+
 // ─── Room join request ──────────────────────────────────────────────
 
 export interface JoinRoomPayload {

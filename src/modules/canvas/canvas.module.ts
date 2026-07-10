@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { AuditModule } from "../audit/audit.module";
+import { RealtimeModule } from "../realtime/realtime.module";
 import { Workflow } from "../workflows/entities/workflow.entity";
 import { WorkflowVersion } from "../workflows/entities/workflow-version.entity";
 import { Canvas } from "./entities/canvas.entity";
@@ -14,6 +15,7 @@ import {
   CanvasObjectController,
 } from "./controllers/canvas.controller";
 import { CanvasService } from "./services/canvas.service";
+import { CanvasRealtimeService } from "./services/canvas-realtime.service";
 
 @Module({
   imports: [
@@ -27,9 +29,10 @@ import { CanvasService } from "./services/canvas.service";
       WorkflowVersion,
     ]),
     AuditModule,
+    RealtimeModule,
   ],
   controllers: [CanvasController, CanvasObjectController],
-  providers: [CanvasService],
+  providers: [CanvasService, CanvasRealtimeService],
   exports: [CanvasService],
 })
 export class CanvasModule {}
