@@ -28,6 +28,7 @@ export class DocumentStorageService {
       useSSL: this.configService.getOrThrow<boolean>('minio.useSsl'),
       accessKey: this.configService.getOrThrow<string>('minio.accessKey'),
       secretKey: this.configService.getOrThrow<string>('minio.secretKey'),
+      region: 'us-east-1',
     });
   }
 

@@ -154,9 +154,11 @@ services:
       target: production
     container_name: flowforge-backend
     profiles: ['core', 'full']
-    volumes:
-      - .:/app
-      - /app/node_modules
+    # Production image has dist/ baked in — no host mount needed
+    # Uncomment for development with hot-reload:
+    # volumes:
+    #   - .:/app
+    #   - /app/node_modules
     depends_on:
       backend-migrate:
         condition: service_completed_successfully

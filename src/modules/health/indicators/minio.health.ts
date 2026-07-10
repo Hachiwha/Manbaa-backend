@@ -31,6 +31,7 @@ export class MinIOHealthIndicator {
       useSSL,
       accessKey,
       secretKey,
+      region: 'us-east-1',
     });
   }
 
