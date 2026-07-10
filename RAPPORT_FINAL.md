@@ -1,46 +1,63 @@
-# Rapport final — Session complète
+# FlowForge Backend — Final Integration Report
 
-## 1. Audit initial
-- **Branche** : `feature/dev1-platform-final` — commit `139f213` (Dev1 intact)
-- **Architecture** : NestJS à la racine, **FastAPI absent**, **Frontend absent**
-- **19 migrations** TypeORM existantes, tests fonctionnels
+**Date:** 2026-07-10  
+**Repository:** ppp-backend  
+**Integration branch:** `integration/backend-final`  
+**HEAD:** `f52a326`
 
-## 2. Fichiers créés/modifiés
+## Summary
 
-| Fichier | Action |
-|---------|--------|
-| `.env.example` | Mis à jour — `NESTJS_CONTEXT=.` (corrigé de `./backend`), sections commentées |
-| `.env.local.example` | Créé — variables pour exécution host |
-| `.env.docker.example` | Créé — variables pour exécution Docker (DNS services) |
-| `.gitignore` | Renforcé — `.env.*`, `.env.backup*`, exceptions `.env.{local,docker}.example` |
-| `docker-compose.yml` | Réécrit — profiles (`core`, `ai`, `frontend`, `full`, `legacy`), service `backend-migrate`, `ollama-init`, renommages (`postgres`, `backend`) |
-| `Dockerfile` | Multi-stage — `builder`, `production` (non-root), `development` (non-root), pnpm épinglé à v9 |
-| `infra/dev/Dockerfile` | Mis à jour — non-root, pnpm v9 |
-| `infra/nats-stream-bootstrap.sh` | Corrigé — supprime `update_config` qui échouait |
-| `scripts/check-health.sh` | Créé — vérification de tous les services |
-| `Makefile` | Créé — `env`, `docker-config`, `infra-up`, `core-up`, `migrate`, `health`, etc. |
-| `RAPPORT_FINAL.md` | Créé — rapport détaillé |
-| `.github/workflows/ci.yml` | Mis à jour — image minio épinglée, `--env-file .env.docker.example` |
-| `pnpm-workspace.yaml` | Rétabli (revert après modification accidentelle) |
+Successfully integrated all active backend branches into a single coherent platform:
 
-## 3. Docker démarré avec succès
-- ✅ **postgres** (pgvector/pgvector:pg16) — healthy
-- ✅ **nats** (NATS JetStream 2.10) — healthy, stream `FLOWFORGE` créé
-- ✅ **redis** (Redis 7.4) — healthy
-- ✅ **minio** — healthy, buckets initialisés
-- ✅ **minio-init** — terminé avec succès
-- ✅ **nats-init** — stream bootstrap réussi
-- ✅ **backend-migrate** — 19 migrations exécutées avec succès
-- ❌ **backend** — erreur pnpm 11 incompatible avec Node 20
+1. **Dev 1 Platform Foundation** — Auth, orgs, workspaces, invitations, members, audit, notifications, usage, AI tasks, outbox, NATS, Redis, MinIO, health, CI, Docker
+2. **Dev 3 Batch 1** — Canvas persistence and CRUD APIs
+3. **Dev 3 Batch 2** — Canvas realtime collaboration, room authorization
+4. **Dev 3 Finalization** — Concepts module, assets module, expanded NATS subjects, Docker/pnpm fix, docker-compose profiles
 
-## 4. Validations
-- ✅ **209 tests unitaires** passés
-- ✅ **3 tests e2e** passés
-- ✅ **2 tests contrats Python** passés
-- ✅ **TypeScript typecheck** 0 erreurs
-- ✅ **Build NestJS** réussi
-- ✅ **19 migrations** validées sans doublon
-- ✅ **Docker Compose config** valide
+## Key fixes applied during integration
 
-## 5. Erreur restante
-Le backend ne démarre pas dans Docker car `corepack prepare pnpm@9 --activate` échoue dans l'image `node:20-alpine`. Solution : utiliser `node:22-alpine` comme base image, ou build hors Docker avec `pnpm build && node dist/main.js`.
+- **Migration renumber**: Canvas migration `1700000011000` → `1700000010500` to fix timestamp conflict with Dev 1
+- **pnpm pinned to 9.15.9**: Corepack replaced with `npm install --global` in Dockerfiles
+- **Conflict resolution**: Combined Dev 1 workspace/org guards with batch-2 canvas guards in realtime module
+
+## Test results
+
+| Suite | Count | Status |
+|-------|-------|--------|
+| Unit tests | 212/212 | ✅ |
+| E2E tests | 3/3 | ✅ |
+| Contract tests | 2/2 | ✅ |
+| Python contract tests | 2/2 | ✅ |
+
+## Docker
+
+All core services running and healthy under Docker Compose.
+
+## Validation commands
+
+```bash
+pnpm install --frozen-lockfile  ✅
+pnpm lint                      ⚠️ (1 pre-existing e2e config)
+pnpm typecheck                 ✅
+pnpm test -- --runInBand       ✅ 212/212
+pnpm test:e2e                  ✅ 3/3
+pnpm build                     ✅
+pnpm migration:validate        ✅ 20 migrations
+docker compose config          ✅
+```
+
+## Push and PR instructions
+
+```bash
+# Push the integration branch
+git push -u origin integration/backend-final
+
+# Create PR to develop
+gh pr create \
+  --base develop \
+  --head integration/backend-final \
+  --title "Finalize and integrate all backend branches" \
+  --body "See docs/BACKEND_BRANCH_INTEGRATION_REPORT.md for details"
+```
+
+Note: `develop` branch must exist on the remote before creating the PR.
