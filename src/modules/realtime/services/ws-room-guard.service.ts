@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Socket } from 'socket.io';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Socket } from "socket.io";
 
+import { Canvas } from "../../canvas/entities/canvas.entity";
 import { Session } from '../../sessions/entities/session.entity';
 import { Workflow } from '../../workflows/entities/workflow.entity';
 import { PipelineExecution } from '../../agents/entities/pipeline-execution.entity';
@@ -26,6 +27,7 @@ interface SocketUserData {
  *
  * Room patterns and their auth rules:
  * - `user:{userId}`      → self-only
+ * - `canvas:{canvasId}`  → org-scoped (Canvas → Workflow.orgId)
  * - `session:{sessionId}` → org-scoped (Session → Workflow.orgId)
  * - `workflow:{workflowId}` → org-scoped (Workflow.orgId)
  * - `pipeline:{pipelineExecutionId}` → org-scoped (Pipeline → Session → Workflow.orgId)
@@ -36,6 +38,8 @@ export class WsRoomGuardService {
   private readonly logger = new Logger(WsRoomGuardService.name);
 
   constructor(
+    @InjectRepository(Canvas)
+    private readonly canvasRepo: Repository<Canvas>,
     @InjectRepository(Session)
     private readonly sessionsRepo: Repository<Session>,
     @InjectRepository(Workflow)
@@ -56,13 +60,19 @@ export class WsRoomGuardService {
     }
 
     // ── user:{userId} — self-only ──
-    if (room.startsWith('user:')) {
-      const targetUserId = room.slice('user:'.length);
+    if (room.startsWith("user:")) {
+      const targetUserId = room.slice("user:".length);
       if (user.userId !== targetUserId) {
-        this.logRejection(user.userId, room, 'Cannot join another user\'s room');
-        return { allowed: false, reason: 'Cannot join another user\'s room' };
+        this.logRejection(user.userId, room, "Cannot join another user's room");
+        return { allowed: false, reason: "Cannot join another user's room" };
       }
       return { allowed: true };
+    }
+
+    // ── canvas:{canvasId} — org-scoped via workflow ──
+    if (room.startsWith("canvas:")) {
+      const canvasId = room.slice("canvas:".length);
+      return this.validateCanvasOrg(user, canvasId, room);
     }
 
     if (room.startsWith('organization:')) {
@@ -71,8 +81,8 @@ export class WsRoomGuardService {
       return allowed?{allowed:true}:{allowed:false,reason:'Organization access denied'};
     }
 
-    if (room.startsWith('workspace:') || room.startsWith('canvas:')) {
-      const workspaceId=room.slice(room.indexOf(':')+1);
+    if (room.startsWith('workspace:')) {
+      const workspaceId=room.slice('workspace:'.length);
       return this.validateWorkspaceMember(user.userId,workspaceId);
     }
 
@@ -193,10 +203,57 @@ export class WsRoomGuardService {
     }
   }
 
+  private async validateCanvasOrg(
+    user: SocketUserData,
+    canvasId: string,
+    room: string,
+  ): Promise<RoomJoinResult> {
+    try {
+      const canvas = await this.canvasRepo.findOne({
+        where: { id: canvasId },
+        select: ["id", "workflowId"],
+      });
+      if (!canvas) {
+        this.logRejection(user.userId, room, "Canvas not found");
+        return { allowed: false, reason: "Canvas not found" };
+      }
+
+      const workflow = await this.workflowsRepo.findOne({
+        where: { id: canvas.workflowId, orgId: user.orgId },
+        select: ["id"],
+      });
+      if (!workflow) {
+        this.logRejection(
+          user.userId,
+          room,
+          "Canvas does not belong to your organization",
+        );
+        return {
+          allowed: false,
+          reason: "Canvas does not belong to your organization",
+        };
+      }
+
+      return { allowed: true };
+    } catch (error) {
+      this.logger.error(
+        `Canvas org validation error: ${(error as Error).message}`,
+      );
+      return { allowed: false, reason: "Validation error" };
+    }
+  }
+
   private logRejection(userId: string | undefined, room: string, reason: string): void {
     this.logger.warn(
       `Room join rejected: userId=${userId ?? 'unknown'} room=${room} reason="${reason}"`,
     );
   }
-  private async validateWorkspaceMember(userId:string,workspaceId:string):Promise<RoomJoinResult>{const allowed=await this.workspaceMembers?.exist({where:{userId,workspaceId,status:WorkspaceMemberStatus.ACTIVE}});return allowed?{allowed:true}:{allowed:false,reason:'Workspace access denied'};}
+  private async validateWorkspaceMember(userId: string, workspaceId: string): Promise<RoomJoinResult> {
+    const allowed = await this.workspaceMembers?.exist({
+      where: { userId, workspaceId, status: WorkspaceMemberStatus.ACTIVE },
+    });
+    return allowed
+      ? { allowed: true }
+      : { allowed: false, reason: 'Workspace access denied' };
+  }
 }
