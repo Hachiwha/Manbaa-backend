@@ -1,0 +1,179 @@
+name: flowforge
+
+services:
+  app-db:
+    image: pgvector/pgvector:pg16
+    container_name: flowforge-app-db
+    environment:
+      POSTGRES_DB: ${APP_DB_NAME:-appdb}
+      POSTGRES_USER: ${APP_DB_USER:-app}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-change-me-app-db-password}
+    ports:
+      - '${APP_DB_PORT:-5432}:5432'
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+      - ./infra/app-db-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  elsa-db:
+    image: postgres:16-alpine
+    container_name: flowforge-elsa-db
+    environment:
+      POSTGRES_DB: ${ELSA_DB_NAME:-elsadb}
+      POSTGRES_USER: ${ELSA_DB_USER:-elsa}
+      POSTGRES_PASSWORD: ${ELSA_DB_PASSWORD:-change-me-elsa-db-password}
+    ports:
+      - '${ELSA_DB_PORT:-5433}:5432'
+    volumes:
+      - elsa-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: flowforge-nats
+    command: ['-c', '/etc/nats/nats.conf']
+    ports:
+      - '${NATS_PORT:-4222}:4222'
+      - '${NATS_MONITOR_PORT:-8222}:8222'
+    volumes:
+      - nats-data:/data
+      - ./infra/nats.conf:/etc/nats/nats.conf:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:8222/healthz || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  nats-init:
+    image: natsio/nats-box:latest
+    container_name: flowforge-nats-init
+    depends_on:
+      nats:
+        condition: service_healthy
+    volumes:
+      - ./infra/nats-stream-bootstrap.sh:/bootstrap.sh:ro
+    entrypoint: ['sh', '/bootstrap.sh']
+    restart: 'no'
+
+  minio:
+    image: minio/minio:latest
+    container_name: flowforge-minio
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-minio-password}
+    ports:
+      - '${MINIO_API_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: flowforge-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-minio-password}
+    volumes:
+      - ./infra/minio-bootstrap.sh:/bootstrap.sh:ro
+    entrypoint: ['sh', '/bootstrap.sh']
+    restart: 'no'
+
+
+  elsa-server:
+    image: ${ELSA_SERVER_IMAGE:-elsaworkflows/elsa-server-v3-5:latest}
+    container_name: flowforge-elsa
+    depends_on:
+      elsa-db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      HTTP_PORTS: 8080
+      HTTP__BASEURL: http://localhost:${ELSA_PORT:-5000}
+      ConnectionStrings__Elsa: Host=elsa-db;Database=${ELSA_DB_NAME:-elsadb};Username=${ELSA_DB_USER:-elsa};Password=${ELSA_DB_PASSWORD:-change-me-elsa-db-password}
+    ports:
+      - '${ELSA_PORT:-5000}:8080'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:8080/health || wget -qO- http://localhost:8080/']
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+  nestjs:
+    build:
+      context: ${NESTJS_CONTEXT:-.}
+      dockerfile: infra/dev/Dockerfile
+    container_name: flowforge-nestjs
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      app-db:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      nats-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgres://${APP_DB_USER:-app}:${APP_DB_PASSWORD:-change-me-app-db-password}@app-db:5432/${APP_DB_NAME:-appdb}
+      NATS_URL: nats://nats:4222
+      NATS_STREAM_NAME: ${NATS_STREAM_NAME:-FLOWFORGE}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-me-with-at-least-32-chars-access}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-me-with-at-least-32-chars-refresh}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: 'false'
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-change-me-minio-password}
+      MINIO_BUCKET_DOCUMENTS: ${MINIO_BUCKET_DOCUMENTS:-documents}
+      MINIO_BUCKET_EXPORTS: ${MINIO_BUCKET_EXPORTS:-exports}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+      DEV_BYPASS_AUTH: ${DEV_BYPASS_AUTH:-true}
+      THROTTLE_TTL: ${THROTTLE_TTL:-60}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - '${NESTJS_PORT:-3000}:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health/ping']
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+volumes:
+  app-db-data:
+  elsa-db-data:
+  nats-data:
+  minio-data:
+#   ollama-models:

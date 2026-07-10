@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.env
+*.log
+coverage
+.vscode
+backend/node_modules
+backend/dist
+frontend/node_modules
+ai-service/venv
