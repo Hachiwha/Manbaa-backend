@@ -75,14 +75,14 @@ export class WsRoomGuardService {
       return this.validateCanvasOrg(user, canvasId, room);
     }
 
-    // ── organization:{organizationId} — member check ──
+// ── organization:{organizationId} — member check ──
     if (room.startsWith('organization:')) {
       const organizationId=room.slice('organization:'.length);
       const allowed=await this.organizationMembers?.exist({where:{organizationId,userId:user.userId,active:true}});
       return allowed?{allowed:true}:{allowed:false,reason:'Organization access denied'};
     }
 
-    // ── workspace:{workspaceId} — member check ──
+// ── workspace:{workspaceId} — member check ──
     if (room.startsWith('workspace:')) {
       const workspaceId=room.slice('workspace:'.length);
       return this.validateWorkspaceMember(user.userId,workspaceId);
@@ -94,7 +94,6 @@ export class WsRoomGuardService {
       const task=await this.aiTasks?.findOne({where:{id:taskId},select:['id','workspaceId']});
       if(!task)return{allowed:false,reason:'AI task not found'};
       return this.validateWorkspaceMember(user.userId,task.workspaceId);
-    }
     }
 
     // ── session:{sessionId} — org-scoped ──
@@ -252,5 +251,12 @@ export class WsRoomGuardService {
       `Room join rejected: userId=${userId ?? 'unknown'} room=${room} reason="${reason}"`,
     );
   }
-  private async validateWorkspaceMember(userId:string,workspaceId:string):Promise<RoomJoinResult>{const allowed=await this.workspaceMembers?.exist({where:{userId,workspaceId,status:WorkspaceMemberStatus.ACTIVE}});return allowed?{allowed:true}:{allowed:false,reason:'Workspace access denied'};}
+  private async validateWorkspaceMember(userId: string, workspaceId: string): Promise<RoomJoinResult> {
+    const allowed = await this.workspaceMembers?.exist({
+      where: { userId, workspaceId, status: WorkspaceMemberStatus.ACTIVE },
+    });
+    return allowed
+      ? { allowed: true }
+      : { allowed: false, reason: 'Workspace access denied' };
+  }
 }

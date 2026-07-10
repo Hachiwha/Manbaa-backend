@@ -35,15 +35,28 @@ export const SUBJECTS_V2 = {
 
   // Concept generation/evaluation
   CONCEPT_GENERATE_REQUESTED: 'workspace.concept.generate.requested',
+  CONCEPT_GENERATION_STARTED: 'workspace.concept.generation.started',
+  CONCEPT_GENERATION_PROGRESS: 'workspace.concept.generation.progress',
   CONCEPT_GENERATED: 'workspace.concept.generated',
+  CONCEPT_GENERATION_FAILED: 'workspace.concept.generation.failed',
   CONCEPT_EVALUATE_REQUESTED: 'workspace.concept.evaluate.requested',
   CONCEPT_EVALUATED: 'workspace.concept.evaluated',
 
+  // Asset generation
+  ASSET_GENERATE_REQUESTED: 'workspace.asset.generate.requested',
+  ASSET_GENERATION_STARTED: 'workspace.asset.generation.started',
+  ASSET_GENERATION_PROGRESS: 'workspace.asset.generation.progress',
+  ASSET_GENERATED: 'workspace.asset.generated',
+  ASSET_GENERATION_FAILED: 'workspace.asset.generation.failed',
+  ASSET_VARIATIONS_REQUESTED: 'workspace.asset.variations.requested',
+
   // Export
   EXPORT_REQUESTED: 'workspace.export.requested',
+  EXPORT_STARTED: 'workspace.export.started',
   EXPORT_PROGRESS: 'workspace.export.progress',
   EXPORT_COMPLETED: 'workspace.export.completed',
   EXPORT_FAILED: 'workspace.export.failed',
+  EXPORT_CANCEL_REQUESTED: 'workspace.export.cancel.requested',
 
   // Worker heartbeats
   WORKER_HEARTBEAT: 'worker.heartbeat',
@@ -108,6 +121,8 @@ export const STREAM_SUBJECTS = [
   'workspace.canvas.>',
   'workspace.concept.*',
   'workspace.concept.>',
+  'workspace.asset.*',
+  'workspace.asset.>',
   'workspace.export.*',
   'workspace.export.>',
   'worker.*',

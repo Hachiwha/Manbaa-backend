@@ -26,7 +26,7 @@ import { AiTask } from '../jobs/entities/ai-task.entity';
       }),
     }),
     NatsModule,
-TypeOrmModule.forFeature([Canvas, Session, Workflow, PipelineExecution, Document, WorkspaceMember, OrganizationMember, AiTask]),
+    TypeOrmModule.forFeature([Canvas, Session, Workflow, PipelineExecution, Document, WorkspaceMember, OrganizationMember, AiTask]),
   ],
   providers: [
     RealtimeGateway,
