@@ -1,18 +1,24 @@
-FROM node:20-alpine
+ARG NODE_VERSION=20
+ARG PNPM_VERSION=9.15.9
+
+FROM node:${NODE_VERSION}-alpine
+
+ARG PNPM_VERSION
+RUN npm install --global pnpm@${PNPM_VERSION} \
+    && pnpm --version \
+    && node --version
 
 WORKDIR /app
 
-# Enable pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Install dependencies first for better caching
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --no-optional
 
-# Copy the rest of the application
 COPY . .
 
 EXPOSE 3000
 
-# Start in development mode with watch
+USER appuser
+
 CMD ["pnpm", "start:dev"]

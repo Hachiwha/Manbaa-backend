@@ -12,6 +12,7 @@ jobs:
         with: {version: 9.15.9}
       - uses: actions/setup-node@v4
         with: {node-version: 20, cache: pnpm}
+      - run: node --version && pnpm --version
       - run: pnpm install --frozen-lockfile
       - run: docker run -d --name nats-ci -p 4222:4222 nats:2.10-alpine -js
       - run: docker run -d --name minio-ci -p 9000:9000 -e MINIO_ROOT_USER=minio -e MINIO_ROOT_PASSWORD=change-me-minio-password minio/minio:latest server /data

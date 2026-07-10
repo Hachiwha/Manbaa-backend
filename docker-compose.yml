@@ -1,24 +1,11 @@
 name: flowforge
 
 services:
-  redis:
-    image: redis:7.4-alpine
-    container_name: flowforge-redis
-    command: ['redis-server', '--appendonly', 'yes']
-    ports:
-      - '${REDIS_PORT:-6379}:6379'
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
-  app-db:
+  # ─── Core Infrastructure ──────────────────────────────────────────
+  postgres:
     image: pgvector/pgvector:pg16
-    container_name: flowforge-app-db
+    container_name: flowforge-postgres
+    profiles: ['core', 'ai', 'full']
     environment:
       POSTGRES_DB: ${APP_DB_NAME:-appdb}
       POSTGRES_USER: ${APP_DB_USER:-app}
@@ -26,18 +13,20 @@ services:
     ports:
       - '${APP_DB_PORT:-5432}:5432'
     volumes:
-      - app-db-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
       - ./infra/app-db-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
-      timeout: 3s
+      timeout: 5s
       retries: 20
       start_period: 10s
+    restart: unless-stopped
 
   elsa-db:
     image: postgres:16-alpine
     container_name: flowforge-elsa-db
+    profiles: ['legacy']
     environment:
       POSTGRES_DB: ${ELSA_DB_NAME:-elsadb}
       POSTGRES_USER: ${ELSA_DB_USER:-elsa}
@@ -52,10 +41,12 @@ services:
       timeout: 3s
       retries: 20
       start_period: 10s
+    restart: unless-stopped
 
   nats:
     image: nats:2.10-alpine
     container_name: flowforge-nats
+    profiles: ['core', 'ai', 'full']
     command: ['-c', '/etc/nats/nats.conf']
     ports:
       - '${NATS_PORT:-4222}:4222'
@@ -69,21 +60,43 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+    restart: unless-stopped
 
   nats-init:
-    image: natsio/nats-box:latest
+    image: natsio/nats-box:0.15.0
     container_name: flowforge-nats-init
+    profiles: ['core', 'ai', 'full']
     depends_on:
       nats:
         condition: service_healthy
+    environment:
+      NATS_URL: nats://nats:4222
+      NATS_STREAM_NAME: ${NATS_STREAM_NAME:-FLOWFORGE}
     volumes:
       - ./infra/nats-stream-bootstrap.sh:/bootstrap.sh:ro
     entrypoint: ['sh', '/bootstrap.sh']
     restart: 'no'
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: flowforge-redis
+    profiles: ['core', 'ai', 'full']
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   minio:
     image: minio/minio:latest
     container_name: flowforge-minio
+    profiles: ['core', 'ai', 'full']
     command: server /data --console-address ':9001'
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
@@ -99,10 +112,12 @@ services:
       timeout: 3s
       retries: 20
       start_period: 10s
+    restart: unless-stopped
 
   minio-init:
     image: minio/mc:latest
     container_name: flowforge-minio-init
+    profiles: ['core', 'ai', 'full']
     depends_on:
       minio:
         condition: service_healthy
@@ -114,25 +129,125 @@ services:
     entrypoint: ['sh', '/bootstrap.sh']
     restart: 'no'
 
+  # ─── Migration Service ────────────────────────────────────────────
+  backend-migrate:
+    build:
+      context: ${NESTJS_CONTEXT:-.}
+      dockerfile: ${NESTJS_DOCKERFILE:-Dockerfile}
+      target: builder
+    container_name: flowforge-backend-migrate
+    profiles: ['core', 'full']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MIGRATION_DATABASE_URL: postgres://${APP_DB_USER:-app}:${APP_DB_PASSWORD:-change-me-app-db-password}@postgres:5432/${APP_DB_NAME:-appdb}
+      NODE_ENV: ${NODE_ENV:-development}
+    command: ['pnpm', 'migration:run']
+    restart: 'no'
+
+  # ─── Backend (NestJS) ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ${NESTJS_CONTEXT:-.}
+      dockerfile: ${NESTJS_DOCKERFILE:-Dockerfile}
+      target: production
+    container_name: flowforge-backend
+    profiles: ['core', 'full']
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://${APP_DB_USER:-app}:${APP_DB_PASSWORD:-change-me-app-db-password}@postgres:5432/${APP_DB_NAME:-appdb}
+      MIGRATION_DATABASE_URL: postgres://${APP_DB_USER:-app}:${APP_DB_PASSWORD:-change-me-app-db-password}@postgres:5432/${APP_DB_NAME:-appdb}
+      NATS_URL: nats://nats:4222
+      NATS_STREAM_NAME: ${NATS_STREAM_NAME:-FLOWFORGE}
+      REDIS_URL: redis://redis:6379
+      REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-5000}
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-platform:}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-me-with-at-least-32-chars-access}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-me-with-at-least-32-chars-refresh}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-replace-me-internal-secret-at-least-32-chars}
+      INTERNAL_AUTH_PREVIOUS_SECRET: ${INTERNAL_AUTH_PREVIOUS_SECRET:-}
+      INTERNAL_AUTH_ISSUER: ${INTERNAL_AUTH_ISSUER:-nestjs-platform}
+      INTERNAL_AUTH_AUDIENCE: ${INTERNAL_AUTH_AUDIENCE:-fastapi-workers}
+      INTERNAL_AUTH_ALLOWED_SERVICES: ${INTERNAL_AUTH_ALLOWED_SERVICES:-ai-orchestrator,document-worker,research-worker,media-worker,export-worker}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: 'false'
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-change-me-minio-password}
+      MINIO_BUCKET_DOCUMENTS: ${MINIO_BUCKET_DOCUMENTS:-documents}
+      MINIO_BUCKET_EXPORTS: ${MINIO_BUCKET_EXPORTS:-exports}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      FASTAPI_HEALTH_URL: ${FASTAPI_HEALTH_URL:-http://ai-service:8000/health}
+      FASTAPI_INTERNAL_URL: ${FASTAPI_INTERNAL_URL:-http://ai-service:8000/internal}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+      DEV_BYPASS_AUTH: ${DEV_BYPASS_AUTH:-false}
+      THROTTLE_TTL: ${THROTTLE_TTL:-60}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
+    ports:
+      - '${NESTJS_PORT:-3000}:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health/ping']
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    restart: unless-stopped
+
+  # ─── Ollama ───────────────────────────────────────────────────────
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.5.4
     container_name: flowforge-ollama
+    profiles: ['ai', 'full']
     ports:
       - '${OLLAMA_PORT:-11434}:11434'
     volumes:
       - ollama-models:/root/.ollama
     restart: unless-stopped
-    profiles: ['ai', 'full']
     healthcheck:
-      test: ['CMD', 'ollama', 'list']
-      interval: 10s
-      timeout: 5s
-      retries: 20
+      test: ['CMD-SHELL', 'ollama list 2>/dev/null || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 60s
 
+  ollama-init:
+    image: ollama/ollama:0.5.4
+    container_name: flowforge-ollama-init
+    profiles: ['ai', 'full']
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama-models:/root/.ollama
+      - ./infra/ollama-pull.sh:/pull.sh:ro
+    entrypoint: ['sh', '/pull.sh']
+    restart: 'no'
 
+  # ─── Elsa (Legacy) ────────────────────────────────────────────────
   elsa-server:
     image: ${ELSA_SERVER_IMAGE:-elsaworkflows/elsa-server-v3-5:latest}
     container_name: flowforge-elsa
+    profiles: ['legacy']
     depends_on:
       elsa-db:
         condition: service_healthy
@@ -149,72 +264,12 @@ services:
       timeout: 5s
       retries: 18
       start_period: 30s
-
-  nestjs:
-    build:
-      context: ${NESTJS_CONTEXT:-.}
-      dockerfile: infra/dev/Dockerfile
-    container_name: flowforge-nestjs
-    volumes:
-      - .:/app
-      - /app/node_modules
-    depends_on:
-      app-db:
-        condition: service_healthy
-      nats:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      nats-init:
-        condition: service_completed_successfully
-      minio-init:
-        condition: service_completed_successfully
-    environment:
-      NODE_ENV: development
-      PORT: 3000
-      DATABASE_URL: postgres://${APP_DB_USER:-app}:${APP_DB_PASSWORD:-change-me-app-db-password}@app-db:5432/${APP_DB_NAME:-appdb}
-      NATS_URL: nats://nats:4222
-      NATS_STREAM_NAME: ${NATS_STREAM_NAME:-FLOWFORGE}
-      REDIS_URL: redis://redis:6379
-      REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-5000}
-      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-platform:}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-me-with-at-least-32-chars-access}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-me-with-at-least-32-chars-refresh}
-      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
-      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
-      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-replace-me-internal-secret-at-least-32-chars}
-      INTERNAL_AUTH_ISSUER: ${INTERNAL_AUTH_ISSUER:-nestjs-platform}
-      INTERNAL_AUTH_AUDIENCE: ${INTERNAL_AUTH_AUDIENCE:-fastapi-workers}
-      INTERNAL_AUTH_ALLOWED_SERVICES: ${INTERNAL_AUTH_ALLOWED_SERVICES:-ai-orchestrator,document-worker,research-worker,media-worker,export-worker}
-      MINIO_ENDPOINT: minio
-      MINIO_PORT: 9000
-      MINIO_USE_SSL: 'false'
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-change-me-minio-password}
-      MINIO_BUCKET_DOCUMENTS: ${MINIO_BUCKET_DOCUMENTS:-documents}
-      MINIO_BUCKET_EXPORTS: ${MINIO_BUCKET_EXPORTS:-exports}
-      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
-      DEV_BYPASS_AUTH: ${DEV_BYPASS_AUTH:-false}
-      THROTTLE_TTL: ${THROTTLE_TTL:-60}
-      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-    ports:
-      - '${NESTJS_PORT:-3000}:3000'
-    healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health/ping']
-      interval: 10s
-      timeout: 5s
-      retries: 18
-      start_period: 30s
+    restart: unless-stopped
 
 volumes:
-  app-db-data:
+  postgres-data:
   elsa-db-data:
   nats-data:
   minio-data:
   redis-data:
   ollama-models:
-#   ollama-models:

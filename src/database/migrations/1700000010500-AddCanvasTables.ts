@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddCanvasTables1700000011000 implements MigrationInterface {
-  name = "AddCanvasTables1700000011000";
+export class AddCanvasTables1700000010500 implements MigrationInterface {
+  name = "AddCanvasTables1700000010500";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
