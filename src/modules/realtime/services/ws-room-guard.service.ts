@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Socket } from 'socket.io';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Socket } from "socket.io";
 
+import { Canvas } from "../../canvas/entities/canvas.entity";
 import { Session } from '../../sessions/entities/session.entity';
 import { Workflow } from '../../workflows/entities/workflow.entity';
 import { PipelineExecution } from '../../agents/entities/pipeline-execution.entity';
@@ -26,6 +27,7 @@ interface SocketUserData {
  *
  * Room patterns and their auth rules:
  * - `user:{userId}`      → self-only
+ * - `canvas:{canvasId}`  → org-scoped (Canvas → Workflow.orgId)
  * - `session:{sessionId}` → org-scoped (Session → Workflow.orgId)
  * - `workflow:{workflowId}` → org-scoped (Workflow.orgId)
  * - `pipeline:{pipelineExecutionId}` → org-scoped (Pipeline → Session → Workflow.orgId)
@@ -36,6 +38,8 @@ export class WsRoomGuardService {
   private readonly logger = new Logger(WsRoomGuardService.name);
 
   constructor(
+    @InjectRepository(Canvas)
+    private readonly canvasRepo: Repository<Canvas>,
     @InjectRepository(Session)
     private readonly sessionsRepo: Repository<Session>,
     @InjectRepository(Workflow)
@@ -56,31 +60,41 @@ export class WsRoomGuardService {
     }
 
     // ── user:{userId} — self-only ──
-    if (room.startsWith('user:')) {
-      const targetUserId = room.slice('user:'.length);
+    if (room.startsWith("user:")) {
+      const targetUserId = room.slice("user:".length);
       if (user.userId !== targetUserId) {
-        this.logRejection(user.userId, room, 'Cannot join another user\'s room');
-        return { allowed: false, reason: 'Cannot join another user\'s room' };
+        this.logRejection(user.userId, room, "Cannot join another user's room");
+        return { allowed: false, reason: "Cannot join another user's room" };
       }
       return { allowed: true };
     }
 
+    // ── canvas:{canvasId} — org-scoped via workflow ──
+    if (room.startsWith("canvas:")) {
+      const canvasId = room.slice("canvas:".length);
+      return this.validateCanvasOrg(user, canvasId, room);
+    }
+
+    // ── organization:{organizationId} — member check ──
     if (room.startsWith('organization:')) {
       const organizationId=room.slice('organization:'.length);
       const allowed=await this.organizationMembers?.exist({where:{organizationId,userId:user.userId,active:true}});
       return allowed?{allowed:true}:{allowed:false,reason:'Organization access denied'};
     }
 
-    if (room.startsWith('workspace:') || room.startsWith('canvas:')) {
-      const workspaceId=room.slice(room.indexOf(':')+1);
+    // ── workspace:{workspaceId} — member check ──
+    if (room.startsWith('workspace:')) {
+      const workspaceId=room.slice('workspace:'.length);
       return this.validateWorkspaceMember(user.userId,workspaceId);
     }
 
+    // ── ai-task:{taskId} — workspace-scoped ──
     if (room.startsWith('ai-task:')) {
       const taskId=room.slice('ai-task:'.length);
       const task=await this.aiTasks?.findOne({where:{id:taskId},select:['id','workspaceId']});
       if(!task)return{allowed:false,reason:'AI task not found'};
       return this.validateWorkspaceMember(user.userId,task.workspaceId);
+    }
     }
 
     // ── session:{sessionId} — org-scoped ──
@@ -190,6 +204,46 @@ export class WsRoomGuardService {
     } catch (error) {
       this.logger.error(`Pipeline org validation error: ${(error as Error).message}`);
       return { allowed: false, reason: 'Validation error' };
+    }
+  }
+
+  private async validateCanvasOrg(
+    user: SocketUserData,
+    canvasId: string,
+    room: string,
+  ): Promise<RoomJoinResult> {
+    try {
+      const canvas = await this.canvasRepo.findOne({
+        where: { id: canvasId },
+        select: ["id", "workflowId"],
+      });
+      if (!canvas) {
+        this.logRejection(user.userId, room, "Canvas not found");
+        return { allowed: false, reason: "Canvas not found" };
+      }
+
+      const workflow = await this.workflowsRepo.findOne({
+        where: { id: canvas.workflowId, orgId: user.orgId },
+        select: ["id"],
+      });
+      if (!workflow) {
+        this.logRejection(
+          user.userId,
+          room,
+          "Canvas does not belong to your organization",
+        );
+        return {
+          allowed: false,
+          reason: "Canvas does not belong to your organization",
+        };
+      }
+
+      return { allowed: true };
+    } catch (error) {
+      this.logger.error(
+        `Canvas org validation error: ${(error as Error).message}`,
+      );
+      return { allowed: false, reason: "Validation error" };
     }
   }
 

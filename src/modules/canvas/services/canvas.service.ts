@@ -10,6 +10,7 @@ import { ActorType, UserRole } from "../../../database/enums";
 import { AuditService } from "../../audit/audit.service";
 import { Workflow } from "../../workflows/entities/workflow.entity";
 import { WorkflowVersion } from "../../workflows/entities/workflow-version.entity";
+import { CanvasRealtimeService } from "./canvas-realtime.service";
 import { Canvas } from "../entities/canvas.entity";
 import { CanvasObject } from "../entities/canvas-object.entity";
 import { CanvasOperation } from "../entities/canvas-operation.entity";
@@ -50,6 +51,7 @@ export class CanvasService {
     private readonly workflowVersionRepository: Repository<WorkflowVersion>,
     private readonly dataSource: DataSource,
     private readonly auditService: AuditService,
+    private readonly realtime: CanvasRealtimeService,
   ) {}
 
   // ─── Canvas ───────────────────────────────────────────────────────
@@ -147,6 +149,8 @@ export class CanvasService {
       afterState: { type: saved.type, label: saved.label },
     });
 
+    this.realtime.broadcastObjectCreated(canvas.id, workflowId, saved);
+
     return saved;
   }
 
@@ -210,6 +214,12 @@ export class CanvasService {
       },
     });
 
+    this.realtime.broadcastObjectUpdated(
+      obj.canvasId,
+      (await this.resolveWorkflowId(obj.canvasId, caller.orgId))!,
+      saved,
+    );
+
     return saved;
   }
 
@@ -260,6 +270,12 @@ export class CanvasService {
       },
     });
 
+    this.realtime.broadcastObjectMoved(
+      obj.canvasId,
+      (await this.resolveWorkflowId(obj.canvasId, caller.orgId))!,
+      saved,
+    );
+
     return saved;
   }
 
@@ -286,10 +302,13 @@ export class CanvasService {
 
     await this.canvasObjectRepository.remove(obj);
 
+    const deletedWorkflowId = await this.resolveWorkflowId(
+      obj.canvasId,
+      caller.orgId,
+    );
+
     await this.auditService.log({
-      workflowId:
-        (await this.resolveWorkflowId(obj.canvasId, caller.orgId)) ??
-        undefined,
+      workflowId: deletedWorkflowId ?? undefined,
       actorId: caller.id,
       actorType: ActorType.USER,
       eventType: "CANVAS_OBJECT_DELETED",
@@ -297,6 +316,12 @@ export class CanvasService {
       beforeState: { type: obj.type, label: obj.label },
       afterState: null,
     });
+
+    this.realtime.broadcastObjectDeleted(
+      obj.canvasId,
+      deletedWorkflowId!,
+      objectId,
+    );
 
     return { deleted: true };
   }
@@ -561,6 +586,14 @@ export class CanvasService {
         object_count: objects.length,
       },
     });
+
+    this.realtime.broadcastCanvasCommitted(
+      canvas.id,
+      workflow.id,
+      savedCanvasVersion,
+      workflowVersionId,
+      newVersionNumber,
+    );
 
     return savedCanvasVersion;
   }

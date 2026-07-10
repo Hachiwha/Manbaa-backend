@@ -34,8 +34,18 @@ export const WS_EVENTS = {
   // System events
   SYSTEM_HEALTH_ALERT: 'system.health.alert',
 
+  // Canvas events
+  CANVAS_OBJECT_CREATED: "canvas.object.created",
+  CANVAS_OBJECT_UPDATED: "canvas.object.updated",
+  CANVAS_OBJECT_MOVED: "canvas.object.moved",
+  CANVAS_OBJECT_DELETED: "canvas.object.deleted",
+  CANVAS_COMMITTED: "canvas.committed",
+  CANVAS_CURSOR: "canvas.cursor",
+  CANVAS_PRESENCE_JOIN: "canvas.presence.join",
+  CANVAS_PRESENCE_LEAVE: "canvas.presence.leave",
+
   // Notification events
-  NOTIFICATION_REVIEW_REQUEST: 'notification.review_request',
+  NOTIFICATION_REVIEW_REQUEST: "notification.review_request",
 } as const;
 
 /**
@@ -46,13 +56,15 @@ export const WS_ROOMS = {
   session: (sessionId: string) => `session:${sessionId}`,
   workflow: (workflowId: string) => `workflow:${workflowId}`,
   pipeline: (pipelineExecutionId: string) => `pipeline:${pipelineExecutionId}`,
-  adminHealth: 'admin-health',
+  canvas: (canvasId: string) => `canvas:${canvasId}`,
+  adminHealth: "admin-health",
 } as const;
 
 /** Client → server events the gateway listens to. */
 export const WS_CLIENT_EVENTS = {
-  JOIN_ROOM: 'joinRoom',
-  LEAVE_ROOM: 'leaveRoom',
+  JOIN_ROOM: "joinRoom",
+  LEAVE_ROOM: "leaveRoom",
+  CURSOR_UPDATE: "cursor.update",
 } as const;
 
 /** Emitted back to the client on room-join failure. */
