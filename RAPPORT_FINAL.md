@@ -25,6 +25,12 @@ The backend integration branch was finalized and validated on this machine. The 
 - Added `.gitattributes` to force LF endings for shell scripts.
 - Fixed lint tsconfig include from `test/**/*` to `tests/**/*`.
 - Made `pnpm test:contracts` cross-platform on Windows.
+- Fixed Skills routes by using the registered `jwt-access` strategy and moving `GET /api/skills/export` ahead of `GET /api/skills/:id`.
+- Added a FastAPI-disabled Skills fallback: skills can be created with `embedding=null`, and search falls back to text matching.
+- Moved Skills mutation audit from the workflow-only `audit_log` table to `platform_audit_log`.
+- Removed fixed Compose `container_name` entries so isolated `--project-name` deployment simulations work.
+- Added deployment smoke scripts for PowerShell and POSIX shells.
+- Fixed NATS stream bootstrap to include canonical `workspace.*` subjects and update existing streams; AI task outbox events now publish.
 
 ## Docker Validation
 
@@ -38,6 +44,7 @@ Core stack is running and healthy:
 - `backend-migrate`: completed
 - `nats-init`: completed
 - `minio-init`: completed
+- Isolated deployment project `flowforge-deployment-test`: build/start/health/smoke passed
 
 Runtime versions:
 
@@ -72,7 +79,7 @@ Swagger:
 | `pnpm install --frozen-lockfile` | passed |
 | `pnpm lint` | passed |
 | `pnpm typecheck` | passed |
-| `pnpm run test -- --runInBand` | passed, 34 suites / 212 tests |
+| `pnpm run test -- --runInBand` | passed, 35 suites / 214 tests |
 | `pnpm test:e2e` | passed, 1 suite / 3 tests |
 | `pnpm build` | passed |
 | `pnpm test:contracts` | passed, 2 TS tests / 2 Python tests |
@@ -80,6 +87,8 @@ Swagger:
 | `ruff check .` | passed |
 | `python -m mypy .` | passed |
 | PowerShell health script | passed |
+| PowerShell deployment smoke script | passed |
+| Isolated Compose deployment simulation | passed |
 
 Notes:
 
@@ -97,11 +106,16 @@ Validated through the running Docker backend:
 - Create/update asset
 - List asset versions
 - Generate signed asset download URL
+- Create skill with FastAPI disabled
+- Export skills
+- Search skills using text fallback
+- Run deployment smoke path: auth, workspace, AI task create/cancel
+- Verify AI task outbox events publish to NATS in a fresh isolated deployment
 
 ## Feature Classification
 
-- Working: auth, organizations, workspaces, invitations, audit, notifications, usage, NATS, Redis, MinIO, health, Swagger, canvas route wiring, concepts CRUD/archive, asset metadata/signed URL path.
-- Partial: AI task lifecycle without real workers, Socket.IO multi-instance behavior, assets generation/variations, BPMN/PDF exports.
+- Working: auth, organizations, workspaces, invitations, audit, notifications, usage, NATS, Redis, MinIO, health, Swagger, canvas route wiring, skill CRUD/export/text fallback, concepts CRUD/archive, asset metadata/signed URL path.
+- Partial: AI task lifecycle without real workers, Socket.IO multi-instance behavior, concepts/assets generation, assets variations, BPMN/PDF exports.
 - Worker-dependent: AI model execution, RAG, document extraction, research, media generation, BPMN/PDF export generation.
 - Optional disabled in core: FastAPI workers, Ollama, Elsa.
 

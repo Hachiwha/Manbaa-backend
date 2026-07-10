@@ -33,7 +33,7 @@ type RequestUser = {
 @ApiTags('skills')
 @ApiBearerAuth()
 @Controller('skills')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt-access'))
 export class SkillsController {
   constructor(private readonly skillsService: SkillsService) {}
 
@@ -58,6 +58,25 @@ export class SkillsController {
     );
   }
 
+  @Post('search')
+  @ApiOperation({ summary: 'Semantic search for skills' })
+  search(@Body() dto: SemanticSearchDto, @CurrentUser() caller: RequestUser) {
+    return this.skillsService.semanticSearch(dto, caller);
+  }
+
+  @Post('import')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Import skills in batch' })
+  import(@Body() dto: ImportSkillsDto, @CurrentUser() caller: RequestUser) {
+    return this.skillsService.importSkills(dto.skills, caller);
+  }
+
+  @Get('export')
+  @ApiOperation({ summary: 'Export all active skills' })
+  export(@CurrentUser() caller: RequestUser) {
+    return this.skillsService.exportSkills(caller);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get skill detail with usage stats' })
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() caller: RequestUser) {
@@ -79,25 +98,6 @@ export class SkillsController {
   @ApiOperation({ summary: 'Soft delete skill' })
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() caller: RequestUser) {
     return this.skillsService.remove(id, caller);
-  }
-
-  @Post('search')
-  @ApiOperation({ summary: 'Semantic search for skills' })
-  search(@Body() dto: SemanticSearchDto, @CurrentUser() caller: RequestUser) {
-    return this.skillsService.semanticSearch(dto, caller);
-  }
-
-  @Post('import')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Import skills in batch' })
-  import(@Body() dto: ImportSkillsDto, @CurrentUser() caller: RequestUser) {
-    return this.skillsService.importSkills(dto.skills, caller);
-  }
-
-  @Get('export')
-  @ApiOperation({ summary: 'Export all active skills' })
-  export(@CurrentUser() caller: RequestUser) {
-    return this.skillsService.exportSkills(caller);
   }
 
   @Get(':id/applications')

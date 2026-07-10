@@ -6,13 +6,15 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { RequestContextService } from '../../../core/context/request-context.service';
+import { PlatformAuditService } from '../../audit/platform-audit.service';
 import { Skill } from '../entities/skill.entity';
 import { SkillApplication } from '../entities/skill-application.entity';
-import { SkillType, ActorType, UserRole } from '../../../database/enums';
+import { SkillType, UserRole } from '../../../database/enums';
 import { JsonValue } from '../../../database/types/json-value.type';
 
 import {
@@ -37,6 +39,10 @@ interface EmbeddingResult {
   embedding: number[];
 }
 
+interface MaybeEmbeddingResult {
+  embedding: number[] | null;
+}
+
 @Injectable()
 export class SkillsService {
   constructor(
@@ -44,7 +50,9 @@ export class SkillsService {
     private readonly skillRepo: Repository<Skill>,
     @InjectRepository(SkillApplication)
     private readonly skillAppRepo: Repository<SkillApplication>,
-    private readonly auditService: AuditService,
+    private readonly auditService: PlatformAuditService,
+    private readonly configService: ConfigService,
+    private readonly requestContext: RequestContextService,
   ) {}
 
   /**
@@ -93,7 +101,7 @@ export class SkillsService {
     const saved = await this.skillRepo.save(skill);
 
     // Audit log
-    await this.logSkillChange(saved.id, caller.id, null, { ...saved, isMandatory } as any, 'SKILL_CREATED');
+    await this.logSkillChange(saved.id, caller.orgId, caller.id, null, { ...saved, isMandatory } as any, 'skill.created');
 
     return this.toResponseDto(saved);
   }
@@ -181,7 +189,7 @@ export class SkillsService {
     const updated = await this.skillRepo.save(skill);
 
     // Audit log
-    await this.logSkillChange(id, caller.id, beforeState as any, updated, 'SKILL_UPDATED');
+    await this.logSkillChange(id, caller.orgId, caller.id, beforeState as any, updated, 'skill.updated');
 
     return this.toResponseDto(updated);
   }
@@ -201,14 +209,13 @@ export class SkillsService {
     await this.skillRepo.save(skill);
 
     // Audit log
-    await this.logSkillChange(id, caller.id, { isActive: true } as any, { isActive: false } as any, 'SKILL_DELETED');
+    await this.logSkillChange(id, caller.orgId, caller.id, { isActive: true } as any, { isActive: false } as any, 'skill.deleted');
   }
 
   /**
    * Semantic search - embed query, then pgvector similarity search
    */
   async semanticSearch(dto: SemanticSearchDto, caller: RequestUser): Promise<SemanticSearchResultDto[]> {
-    // Generate embedding for query
     let queryEmbedding: number[] | null = null;
     try {
       queryEmbedding = await this.generateEmbedding(dto.queryText);
@@ -224,7 +231,7 @@ export class SkillsService {
     };
 
     if (dto.filterTypes && dto.filterTypes.length > 0) {
-      whereClause.skillType = dto.filterTypes;
+      whereClause.skillType = In(dto.filterTypes);
     }
 
     // Get all active skills for org (simple approach - pgvector in TypeORM needs raw query)
@@ -232,6 +239,10 @@ export class SkillsService {
       where: whereClause,
       order: { usageCount: 'DESC' },
     });
+
+    if (!queryEmbedding) {
+      return this.textSearchFallback(skills, dto);
+    }
 
     // Calculate cosine similarity in memory (for small to medium datasets)
     const results = skills
@@ -529,9 +540,13 @@ export class SkillsService {
     return `Skill: ${name}. Content: ${content}`;
   }
 
-  private async generateEmbedding(text: string): Promise<number[]> {
-    // Call FastAPI internal endpoint
-    const response = await fetch(process.env.FASTAPI_URL + '/internal/embed', {
+  private async generateEmbedding(text: string): Promise<number[] | null> {
+    const url = this.getFastApiUrl('embed');
+    if (!url) {
+      return null;
+    }
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
@@ -545,8 +560,13 @@ export class SkillsService {
     return data.embedding;
   }
 
-  private async generateEmbeddingBatch(texts: string[]): Promise<Array<{ embedding: number[] }>> {
-    const response = await fetch(process.env.FASTAPI_URL + '/internal/embed/batch', {
+  private async generateEmbeddingBatch(texts: string[]): Promise<MaybeEmbeddingResult[]> {
+    const url = this.getFastApiUrl('embed/batch');
+    if (!url) {
+      return texts.map(() => ({ embedding: null }));
+    }
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: texts.map((text) => ({ content: text })) }),
@@ -556,7 +576,60 @@ export class SkillsService {
       throw new Error(`Batch embedding failed: ${response.status}`);
     }
 
-    return (await response.json()) as Array<{ embedding: number[] }>;
+    return (await response.json()) as MaybeEmbeddingResult[];
+  }
+
+  private getFastApiUrl(path: string): string | null {
+    const enabled = this.configService.get<boolean>('health.fastapiEnabled', false);
+    if (!enabled) {
+      return null;
+    }
+
+    const internalUrl =
+      this.configService.get<string>('health.fastapiInternal') ||
+      process.env.FASTAPI_INTERNAL_URL ||
+      (process.env.FASTAPI_URL ? `${process.env.FASTAPI_URL.replace(/\/+$/, '')}/internal` : undefined);
+
+    if (!internalUrl) {
+      return null;
+    }
+
+    return `${internalUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+  }
+
+  private textSearchFallback(skills: Skill[], dto: SemanticSearchDto): SemanticSearchResultDto[] {
+    const query = dto.queryText.trim().toLowerCase();
+    if (!query) {
+      return [];
+    }
+
+    return skills
+      .map((skill) => {
+        const content = String((skill.content as any)?.full ?? '');
+        const haystack = [skill.name, skill.description ?? '', content].join(' ').toLowerCase();
+        const score = haystack.includes(query) ? 1 : this.keywordOverlap(query, haystack);
+        return { skill, score };
+      })
+      .filter((result) => result.score >= (dto.minSimilarity ?? 0.35))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, dto.topK ?? 5)
+      .map((result) => ({
+        id: result.skill.id,
+        name: result.skill.name,
+        skillType: result.skill.skillType,
+        similarityScore: result.score,
+        contentPreview: String((result.skill.content as any)?.full ?? '').substring(0, 200),
+      }));
+  }
+
+  private keywordOverlap(query: string, haystack: string): number {
+    const terms = query.split(/\s+/).filter(Boolean);
+    if (terms.length === 0) {
+      return 0;
+    }
+
+    const matches = terms.filter((term) => haystack.includes(term)).length;
+    return matches / terms.length;
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {
@@ -580,18 +653,21 @@ export class SkillsService {
 
   private async logSkillChange(
     skillId: string,
+    organizationId: string,
     actorId: string,
     beforeState: any,
     afterState: any,
     eventType: string,
   ): Promise<void> {
-    await this.auditService.log({
-      workflowId: skillId,
+    await this.auditService.createAuditLog({
+      organizationId,
       actorId,
-      actorType: ActorType.USER,
-      eventType,
-      beforeState,
-      afterState,
+      action: eventType,
+      entityType: 'skill',
+      entityId: skillId,
+      before: beforeState ?? undefined,
+      after: afterState ?? undefined,
+      correlationId: this.requestContext.getCorrelationId(),
     });
   }
 

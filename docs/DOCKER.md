@@ -64,6 +64,8 @@ Core services:
 - `backend-migrate`
 - `backend`
 
+Compose no longer pins `container_name`, so project-scoped runs such as `--project-name flowforge-deployment-test` create isolated containers and volumes.
+
 ## Migrations
 
 ```bash
@@ -86,6 +88,28 @@ PowerShell:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-health.ps1
+```
+
+## Deployment Smoke Test
+
+The smoke test validates Docker, `.env`, Compose config, core service readiness, PostgreSQL, NATS, Redis, MinIO, auth registration, workspace creation, and AI task create/cancel.
+
+PowerShell:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deployment-smoke-test.ps1
+```
+
+POSIX:
+
+```bash
+sh scripts/deployment-smoke-test.sh
+```
+
+For an isolated project:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deployment-smoke-test.ps1 -ProjectName flowforge-deployment-test
 ```
 
 ## Logs
@@ -124,6 +148,21 @@ docker volume ls --filter name=flowforge
 ```
 
 Delete volumes only after confirming no data is needed.
+
+## Clean Deployment Simulation
+
+To simulate a fresh deployment without deleting normal developer volumes, stop the normal stack first to free host ports, then use a separate Compose project name:
+
+```bash
+docker compose --env-file .env --profile core down
+docker compose --project-name flowforge-deployment-test --env-file .env --profile core up -d --build
+docker compose --project-name flowforge-deployment-test --env-file .env ps
+COMPOSE_PROJECT_NAME=flowforge-deployment-test sh scripts/deployment-smoke-test.sh
+docker compose --project-name flowforge-deployment-test --env-file .env --profile core down
+docker compose --env-file .env --profile core up -d
+```
+
+Do not add `-v` to `down` unless the isolated test volumes are confirmed disposable.
 
 ## Troubleshooting
 

@@ -4,7 +4,6 @@ services:
   # ─── Core Infrastructure ──────────────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: flowforge-postgres
     profiles: ['core', 'ai', 'full']
     environment:
       POSTGRES_DB: ${APP_DB_NAME:-appdb}
@@ -25,7 +24,6 @@ services:
 
   elsa-db:
     image: postgres:16-alpine
-    container_name: flowforge-elsa-db
     profiles: ['legacy']
     environment:
       POSTGRES_DB: ${ELSA_DB_NAME:-elsadb}
@@ -45,7 +43,6 @@ services:
 
   nats:
     image: nats:2.10-alpine
-    container_name: flowforge-nats
     profiles: ['core', 'ai', 'full']
     command: ['-c', '/etc/nats/nats.conf']
     ports:
@@ -64,7 +61,6 @@ services:
 
   nats-init:
     image: natsio/nats-box:0.15.0
-    container_name: flowforge-nats-init
     profiles: ['core', 'ai', 'full']
     depends_on:
       nats:
@@ -79,7 +75,6 @@ services:
 
   redis:
     image: redis:7.4-alpine
-    container_name: flowforge-redis
     profiles: ['core', 'ai', 'full']
     command: ['redis-server', '--appendonly', 'yes']
     ports:
@@ -95,7 +90,6 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: flowforge-minio
     profiles: ['core', 'ai', 'full']
     command: server /data --console-address ':9001'
     environment:
@@ -116,7 +110,6 @@ services:
 
   minio-init:
     image: minio/mc:latest
-    container_name: flowforge-minio-init
     profiles: ['core', 'ai', 'full']
     depends_on:
       minio:
@@ -135,7 +128,6 @@ services:
       context: ${NESTJS_CONTEXT:-.}
       dockerfile: ${NESTJS_DOCKERFILE:-Dockerfile}
       target: builder
-    container_name: flowforge-backend-migrate
     profiles: ['core', 'full']
     depends_on:
       postgres:
@@ -152,7 +144,6 @@ services:
       context: ${NESTJS_CONTEXT:-.}
       dockerfile: ${NESTJS_DOCKERFILE:-Dockerfile}
       target: production
-    container_name: flowforge-backend
     profiles: ['core', 'full']
     # Production image has dist/ baked in — no host mount needed
     # Uncomment for development with hot-reload:
@@ -230,7 +221,6 @@ services:
   # ─── Ollama ───────────────────────────────────────────────────────
   ollama:
     image: ollama/ollama:0.5.4
-    container_name: flowforge-ollama
     profiles: ['ai', 'full']
     ports:
       - '${OLLAMA_PORT:-11434}:11434'
@@ -246,7 +236,6 @@ services:
 
   ollama-init:
     image: ollama/ollama:0.5.4
-    container_name: flowforge-ollama-init
     profiles: ['ai', 'full']
     depends_on:
       ollama:
@@ -260,7 +249,6 @@ services:
   # ─── Elsa (Legacy) ────────────────────────────────────────────────
   elsa-server:
     image: ${ELSA_SERVER_IMAGE:-elsaworkflows/elsa-server-v3-5:latest}
-    container_name: flowforge-elsa
     profiles: ['legacy']
     depends_on:
       elsa-db:

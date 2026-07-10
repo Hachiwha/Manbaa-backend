@@ -63,6 +63,7 @@ Secrets in `.env` must be generated locally and must not be committed. The check
 | `FASTAPI_PORT` | optional | no | `8000` | `8000` | `8000` | Compose/docs | canonical |
 | `FASTAPI_HEALTH_URL` | optional | no | `http://localhost:8000/health` | `http://ai-service:8000/health` | none | Health indicator | canonical |
 | `FASTAPI_INTERNAL_URL` | optional | no | `http://localhost:8000/internal` | `http://ai-service:8000/internal` | none | Worker integration | canonical |
+| `FASTAPI_URL` | optional | no | root FastAPI URL | root FastAPI URL | none | Skills embedding fallback compatibility | legacy |
 | `OLLAMA_ENABLED` | optional | no | `false` | `false` | `false` | Health classification | canonical |
 | `OLLAMA_URL` | optional | no | `http://localhost:11434` | `http://ollama:11434` | none | Ollama health/docs | canonical |
 | `OLLAMA_PORT` | optional | no | `11434` | `11434` | `11434` | Compose/docs | canonical |

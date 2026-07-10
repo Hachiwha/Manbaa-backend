@@ -32,6 +32,7 @@ PowerShell helpers are available on Windows:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-env.ps1 .env
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-health.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deployment-smoke-test.ps1
 ```
 
 ## Local URLs
@@ -124,13 +125,14 @@ The backend is a modular monolith. Async AI, RAG, media, and export execution ar
 Executed on 2026-07-10:
 
 - Docker core stack healthy
+- Clean isolated Compose deployment simulation passed
 - Swagger JSON loads with 130 paths
 - 21 migrations validated
 - 49 public database tables
-- Unit tests: 34 suites, 212 tests passing
+- Unit tests: 35 suites, 214 tests passing
 - E2E tests: 1 suite, 3 tests passing
 - Contract tests: 2 TypeScript and 2 Python tests passing
-- Live concept and asset smoke paths passing
+- Live concept, asset, skill fallback, and deployment smoke paths passing
 
 See:
 
@@ -139,3 +141,5 @@ See:
 - `docs/BACKEND_FEATURE_VALIDATION.md`
 - `docs/BACKEND_MIGRATION_STATUS.md`
 - `docs/BACKEND_DOCKER_VALIDATION.md`
+- `docs/DEPLOYMENT_READINESS_MATRIX.md`
+- `docs/DEPLOYMENT_READINESS_REPORT.md`

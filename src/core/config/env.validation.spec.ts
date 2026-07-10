@@ -32,6 +32,7 @@ const validEnv = {
   OLLAMA_URL: 'http://localhost:11434',
   FASTAPI_HEALTH_URL: 'http://localhost:8000/health',
   FASTAPI_INTERNAL_URL: 'http://localhost:8000/internal',
+  FASTAPI_URL: '',
   ELSA_HEALTH_URL: 'http://localhost:5000/health',
   CORS_ORIGIN: 'http://localhost:3001',
 };

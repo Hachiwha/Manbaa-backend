@@ -41,6 +41,7 @@ export const envSchema = Joi.object({
   OLLAMA_URL: Joi.string().uri().optional(),
   FASTAPI_HEALTH_URL: Joi.string().uri().optional(),
   FASTAPI_INTERNAL_URL: Joi.string().uri().optional(),
+  FASTAPI_URL: Joi.string().uri().allow('').optional(),
   ELSA_HEALTH_URL: Joi.string().uri().optional(),
   CORS_ORIGIN: Joi.string().default('http://localhost:3001'),
   DEV_BYPASS_AUTH: Joi.boolean().default(false),

@@ -41,7 +41,9 @@ export default () => ({
   health: {
     fastapiEnabled: process.env.FASTAPI_ENABLED === 'true',
     fastapi: process.env.FASTAPI_HEALTH_URL,
-    fastapiInternal: process.env.FASTAPI_INTERNAL_URL,
+    fastapiInternal:
+      process.env.FASTAPI_INTERNAL_URL ||
+      (process.env.FASTAPI_URL ? `${process.env.FASTAPI_URL.replace(/\/+$/, '')}/internal` : undefined),
     elsaEnabled: process.env.ELSA_ENABLED === 'true',
     elsa: process.env.ELSA_HEALTH_URL,
   },

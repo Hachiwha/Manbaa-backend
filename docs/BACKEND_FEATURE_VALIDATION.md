@@ -30,9 +30,10 @@ Starting HEAD: `3fc40dc1315fbfab8da01f3b6c94ef02abcfa7ae`
 | MinIO | working | MinIO health up; document and workspace clients include `region: 'us-east-1'`; buckets initialized. |
 | Socket.IO | partial | Auth adapter and room guards tested; single-instance validation passed through startup; multi-instance remains unverified. |
 | Canvas | working | Module registered; CRUD/realtime routes active; tests pass. |
-| Concepts | working | `ConceptsModule` registered; table migration added; live create/list/archive succeeded. Generate/evaluate/approve/reject routes exist; actual AI generation is worker-dependent. |
+| Concepts | partial | `ConceptsModule` registered; table migration added; live create/list/archive succeeded. Generate/evaluate/approve/reject routes exist; actual AI generation is worker-dependent. |
 | Assets | partial | `AssetsModule` implemented and registered; table migration added; live create/update/versions/signed-download succeeded. Generation/variations are worker-dependent placeholders. |
 | Exports | partial | Elsa JSON export is implemented in-process. BPMN/PDF create pipeline execution records and remain worker-dependent. Export NATS subjects exist. |
+| Skills | partial | CRUD/export/text-search fallback live-tested with FastAPI disabled. Embedding generation remains worker-dependent. |
 | Health | working | `/live`, `/ready`, `/ping`, and aggregate `/health` validated. Optional FastAPI/Ollama/Elsa disabled cleanly. |
 | Swagger | working | `/docs-json` returns 130 paths and bearer auth scheme. |
 
@@ -49,6 +50,9 @@ The Docker backend successfully handled:
 - `PATCH /api/v1/workspaces/:workspaceId/assets/:assetId`
 - `GET /api/v1/workspaces/:workspaceId/assets/:assetId/versions`
 - `GET /api/v1/workspaces/:workspaceId/assets/:assetId/download-url`
+- `POST /api/skills`
+- `GET /api/skills/export`
+- `POST /api/skills/search`
 
 ## Remaining Risks
 
@@ -57,3 +61,4 @@ The Docker backend successfully handled:
 - Multi-instance Socket.IO was not fully validated with two backend instances.
 - Asset/concept generation requires real workers to complete generated payloads.
 - BPMN/PDF export generation is worker-dependent.
+- Skills semantic embeddings require FastAPI; text fallback works when `FASTAPI_ENABLED=false`.

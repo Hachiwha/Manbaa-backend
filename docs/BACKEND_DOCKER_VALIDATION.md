@@ -12,6 +12,10 @@ docker compose --env-file .env run --rm --no-deps backend node --version
 docker compose --env-file .env run --rm --no-deps backend pnpm --version
 docker compose --env-file .env --profile core up -d --force-recreate
 docker compose --env-file .env ps
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deployment-smoke-test.ps1
+docker compose --project-name flowforge-deployment-test --env-file .env --profile core up -d --build
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deployment-smoke-test.ps1 -ProjectName flowforge-deployment-test
+docker compose --project-name flowforge-deployment-test --env-file .env --profile core down
 ```
 
 ## Runtime Versions
@@ -36,6 +40,8 @@ docker compose --env-file .env ps
 | `elsa-db` | optional | absent in core | not started | disabled | `legacy` profile |
 | `elsa-server` | optional | absent in core | not started | disabled | `legacy` profile |
 
+Container names are project-scoped, for example `flowforge-backend-1` and `flowforge-deployment-test-backend-1`; the Compose file does not pin `container_name`.
+
 ## Health Results
 
 - `/api/health/live`: `ok`
@@ -58,3 +64,6 @@ Core dependencies in `/ready`:
 - MinIO bootstrap initially created only document/export buckets; it now creates all configured workspace buckets.
 - Duplicate NATS health durable caused backend startup error; `HealthService` now uses its own observer durable.
 - Optional FastAPI/Ollama/Elsa/worker health no longer fails core aggregate health when disabled.
+- Fixed Compose isolation by removing fixed `container_name` entries.
+- Added deployment smoke tests for health, PostgreSQL, NATS, Redis, MinIO, auth registration, workspace creation, and AI task cancel.
+- Updated NATS stream bootstrap to include canonical `workspace.*` subjects and to update existing streams. In the final isolated deployment, AI task outbox events were `published`.
