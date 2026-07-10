@@ -29,6 +29,6 @@
       "@nats/*": ["src/infra/nats/*"]
     }
   },
-  "include": ["src/**/*", "test/**/*"],
+  "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist"]
 }

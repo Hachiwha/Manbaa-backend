@@ -1,102 +1,141 @@
-# ppp-backend — Process Elicitation API
+# ppp-backend - FlowForge Process Elicitation API
 
-The platform exposes versioned authentication, multi-organization workspaces, centralized permissions, invitations, persistent AI tasks, transactional NATS outbox delivery, notifications, quotas, Redis-scaled realtime, workspace-aware MinIO storage, and replay-protected worker authentication. See `docs/PLATFORM_INTEGRATION.md` and the Developer 2/3 guides.
+NestJS + TypeORM + PostgreSQL/pgvector backend for the PPP / FlowForge platform.
 
-NestJS + TypeORM + PostgreSQL/pgvector backend for the PPP platform.
+The backend provides versioned authentication, organizations, workspaces, invitations, centralized workspace permissions, workflows, sessions, messages, documents, rules, skills, audit logs, notifications, usage tracking, AI task orchestration, transactional NATS outbox delivery, Redis-backed realtime support, canvas collaboration, concepts, assets, MinIO storage, and health checks.
 
 ## Tech Stack
 
-- **Framework:** NestJS 10 (TypeScript 5.3)
-- **Database:** PostgreSQL 16 + pgvector via TypeORM
-- **Message Bus:** NATS JetStream 2.10
-- **Object Storage:** MinIO (S3-compatible)
-- **Auth:** Passport/JWT
-- **Realtime:** Socket.IO 4.8
-- **Validation:** class-validator + class-transformer
-- **API Docs:** Swagger/OpenAPI at `/api/docs`
+- Node 20, pnpm 9.15.9
+- NestJS 10, TypeScript
+- PostgreSQL 16 + pgvector via TypeORM
+- NATS JetStream
+- Redis
+- MinIO
+- Socket.IO
+- Swagger/OpenAPI
+- Jest, Supertest, Python contract tests
+- Docker Compose
 
 ## Quick Start
 
 ```bash
-pnpm install
-cp .env.example .env
-docker compose up -d app-db nats minio ollama
-pnpm migration:run
-pnpm start:dev
+pnpm install --frozen-lockfile
+cp .env.docker.example .env
+# replace placeholder secrets in .env
+docker compose --env-file .env --profile core up -d
+pnpm migration:validate
 ```
 
-Health: `http://localhost:3000/api/health/ping`
+PowerShell helpers are available on Windows:
 
-## Architecture
-
-```
-[React Client] <--REST/WS--> [NestJS Gateway] <--NATS--> [FastAPI AI Worker]
-                                  |                          |
-                             [PostgreSQL+pgvector]        [Ollama LLM]
-                                  |
-                             [MinIO S3]
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-env.ps1 .env
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-health.ps1
 ```
 
-The backend is a **modular monolith** with **16 domain modules** coordinated through NATS JetStream for async AI processing.
+## Local URLs
 
-## Modules
+- API base: `http://localhost:3000/api`
+- Health live: `http://localhost:3000/api/health/live`
+- Health ready: `http://localhost:3000/api/health/ready`
+- Health aggregate: `http://localhost:3000/api/health`
+- Swagger UI: `http://localhost:3000/docs`
+- Swagger JSON: `http://localhost:3000/docs-json`
 
-| Module | Purpose |
-|--------|---------|
-| Workflows | CRUD, immutable versions, BPMN/PDF/Elsa export |
-| Sessions | Elicitation FSM (10 states) |
-| AI Gateway | Pipeline orchestration via NATS |
-| Documents | Upload, MinIO storage, preprocessing |
-| Messages | Conversation history |
-| Skills | Reusable knowledge libraries |
-| Rules | Configurable business rules |
-| Audit | Immutable audit trail |
-| Realtime | Socket.IO + NATS-WS bridge |
-| Health | 6 dependency indicators |
-| Organizations | Multi-tenant management |
-| Auth | JWT + refresh tokens |
-| Agents | AI agent definitions & execution |
-| Divergence | Graph comparison |
-| Comments | Workflow annotations |
-| Projects | Workflow grouping |
+## Core Docker Profile
 
-## Project Structure
-
+```bash
+docker compose --env-file .env --profile core up -d
+docker compose --env-file .env ps
 ```
-├── src/
-│   ├── main.ts               # Bootstrap
-│   ├── app.module.ts         # Root module
-│   ├── core/                 # Cross-cutting (config, guards, decorators, messaging)
-│   ├── database/             # TypeORM config, migrations, enums
-│   ├── infra/                # NATS client
-│   └── modules/              # 16 domain modules
-├── docs/
-├── infra/                    # Dockerfiles, init scripts
-├── scripts/                  # Smoke tests, model pull
-├── Dockerfile
-├── docker-compose.yml
-└── .env.example
-```
+
+Core services:
+
+- `postgres`
+- `nats`
+- `redis`
+- `minio`
+- `backend-migrate`
+- `backend`
+
+Optional profiles:
+
+- `ai`: Ollama
+- `legacy`: Elsa
+- `full`: core plus optional services
+
+FastAPI workers are not included in this repository. Keep `FASTAPI_ENABLED=false` unless real workers are deployed.
 
 ## Commands
 
 ```bash
-pnpm build          # Build
-pnpm lint           # Lint
-pnpm test           # Tests
-pnpm migration:run  # Apply migrations
-pnpm migration:generate -- <name>  # New migration
-./scripts/smoke.sh  # Smoke tests
+pnpm lint
+pnpm typecheck
+pnpm run test -- --runInBand
+pnpm test:e2e
+pnpm build
+pnpm test:contracts
+pnpm migration:validate
+docker compose --env-file .env config --quiet
 ```
 
-## Environment Variables
+## Architecture
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
-| `JWT_SECRET` | Yes | — | JWT signing secret |
-| `NATS_URL` | No | `nats://localhost:4222` | NATS server URL |
-| `MINIO_ENDPOINT` | No | `localhost:9000` | MinIO endpoint |
-| `OLLAMA_BASE_URL` | No | `http://localhost:11434` | Ollama URL |
-| `SERVICE_TOKEN` | Yes | — | Shared service auth token |
-| `DEV_BYPASS_AUTH` | No | `false` | Bypass auth in dev |
+```text
+Client -> REST / Socket.IO -> NestJS -> PostgreSQL + pgvector
+                              |
+                              +-> NATS JetStream -> external workers
+                              |
+                              +-> Redis
+                              |
+                              +-> MinIO
+```
+
+The backend is a modular monolith. Async AI, RAG, media, and export execution are worker-dependent.
+
+## Active Modules
+
+- Auth
+- Organizations
+- Workspaces
+- Projects
+- Workflows
+- Sessions
+- Messages
+- Documents
+- Skills
+- Rules
+- AI Gateway
+- Jobs
+- Outbox
+- Notifications
+- Usage
+- Audit
+- Realtime
+- Canvas
+- Comments
+- Concepts
+- Assets
+- Health
+
+## Current Validation Snapshot
+
+Executed on 2026-07-10:
+
+- Docker core stack healthy
+- Swagger JSON loads with 130 paths
+- 21 migrations validated
+- 49 public database tables
+- Unit tests: 34 suites, 212 tests passing
+- E2E tests: 1 suite, 3 tests passing
+- Contract tests: 2 TypeScript and 2 Python tests passing
+- Live concept and asset smoke paths passing
+
+See:
+
+- `docs/DOCKER.md`
+- `docs/ENVIRONMENT_VARIABLES.md`
+- `docs/BACKEND_FEATURE_VALIDATION.md`
+- `docs/BACKEND_MIGRATION_STATUS.md`
+- `docs/BACKEND_DOCKER_VALIDATION.md`

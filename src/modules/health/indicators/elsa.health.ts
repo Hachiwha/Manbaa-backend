@@ -21,6 +21,10 @@ export class ElsaHealthIndicator {
 
   async check(): Promise<HealthCheckResponse> {
     const start = Date.now();
+    const enabled = this.configService.get<boolean>('health.elsaEnabled', false);
+    if (!enabled) {
+      return { status: 'up', details: { elsa: { status: 'disabled', latency_ms: 0 } } };
+    }
     const url = this.configService.get<string>('health.elsa');
     
     try {

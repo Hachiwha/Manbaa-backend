@@ -1,63 +1,115 @@
-# FlowForge Backend — Final Integration Report
+# FlowForge Backend - Final Validation Report
 
-**Date:** 2026-07-10  
-**Repository:** ppp-backend  
-**Integration branch:** `integration/backend-final`  
-**HEAD:** `f52a326`
+Date: 2026-07-10
+Repository: `ppp-backend`
+Branch: `integration/backend-final`
+Starting HEAD: `3fc40dc1315fbfab8da01f3b6c94ef02abcfa7ae`
 
 ## Summary
 
-Successfully integrated all active backend branches into a single coherent platform:
+The backend integration branch was finalized and validated on this machine. The work included module registration fixes, concept/asset schema and API completion, Docker portability fixes, environment template cleanup, optional service health classification, setup/health scripts, and validation documentation.
 
-1. **Dev 1 Platform Foundation** — Auth, orgs, workspaces, invitations, members, audit, notifications, usage, AI tasks, outbox, NATS, Redis, MinIO, health, CI, Docker
-2. **Dev 3 Batch 1** — Canvas persistence and CRUD APIs
-3. **Dev 3 Batch 2** — Canvas realtime collaboration, room authorization
-4. **Dev 3 Finalization** — Concepts module, assets module, expanded NATS subjects, Docker/pnpm fix, docker-compose profiles
+## Key Corrections
 
-## Key fixes applied during integration
+- Registered `AuditModule`, `ConceptsModule`, and `AssetsModule` in `AppModule`.
+- Added an explicit concept/asset migration: `1700000018000-AddConceptsAndAssets.ts`.
+- Implemented `AssetsModule`, `AssetsController`, and `AssetsService`.
+- Added concept archive support and workspace permission checks for concept reads/writes.
+- Added workspace permission checks for assets.
+- Added MinIO workspace bucket aliases and bootstrap support.
+- Kept the MinIO `region: 'us-east-1'` correction in all MinIO clients.
+- Added optional health flags: `FASTAPI_ENABLED`, `OLLAMA_ENABLED`, `ELSA_ENABLED`.
+- Prevented disabled FastAPI/Ollama/Elsa/workers from failing core aggregate health.
+- Fixed duplicate NATS health durable subscription.
+- Fixed Docker native build fallback by installing `python3`, `make`, and `g++` in backend images.
+- Added `.gitattributes` to force LF endings for shell scripts.
+- Fixed lint tsconfig include from `test/**/*` to `tests/**/*`.
+- Made `pnpm test:contracts` cross-platform on Windows.
 
-- **Migration renumber**: Canvas migration `1700000011000` → `1700000010500` to fix timestamp conflict with Dev 1
-- **pnpm pinned to 9.15.9**: Corepack replaced with `npm install --global` in Dockerfiles
-- **Conflict resolution**: Combined Dev 1 workspace/org guards with batch-2 canvas guards in realtime module
+## Docker Validation
 
-## Test results
+Core stack is running and healthy:
 
-| Suite | Count | Status |
-|-------|-------|--------|
-| Unit tests | 212/212 | ✅ |
-| E2E tests | 3/3 | ✅ |
-| Contract tests | 2/2 | ✅ |
-| Python contract tests | 2/2 | ✅ |
+- `postgres`: healthy
+- `nats`: healthy
+- `redis`: healthy
+- `minio`: healthy
+- `backend`: healthy
+- `backend-migrate`: completed
+- `nats-init`: completed
+- `minio-init`: completed
 
-## Docker
+Runtime versions:
 
-All core services running and healthy under Docker Compose.
+- Node in image: `v20.20.2`
+- pnpm in image: `9.15.9`
 
-## Validation commands
+Health endpoints:
 
-```bash
-pnpm install --frozen-lockfile  ✅
-pnpm lint                      ⚠️ (1 pre-existing e2e config)
-pnpm typecheck                 ✅
-pnpm test -- --runInBand       ✅ 212/212
-pnpm test:e2e                  ✅ 3/3
-pnpm build                     ✅
-pnpm migration:validate        ✅ 20 migrations
-docker compose config          ✅
-```
+- `/api/health/live`: ok
+- `/api/health/ready`: ok
+- `/api/health/ping`: ok
+- `/api/health`: ok
 
-## Push and PR instructions
+Swagger:
 
-```bash
-# Push the integration branch
-git push -u origin integration/backend-final
+- UI: `http://localhost:3000/docs`
+- JSON: `http://localhost:3000/docs-json`
+- JSON validation: 130 paths, bearer auth scheme present
 
-# Create PR to develop
-gh pr create \
-  --base develop \
-  --head integration/backend-final \
-  --title "Finalize and integrate all backend branches" \
-  --body "See docs/BACKEND_BRANCH_INTEGRATION_REPORT.md for details"
-```
+## Database
 
-Note: `develop` branch must exist on the remote before creating the PR.
+- Migration files: 21
+- Applied migration rows: 21
+- Public tables: 49
+- Extensions: `citext`, `pgcrypto`, `plpgsql`, `uuid-ossp`, `vector`
+- TypeORM `synchronize`: disabled
+
+## Regression Results
+
+| Command | Result |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | passed |
+| `pnpm lint` | passed |
+| `pnpm typecheck` | passed |
+| `pnpm run test -- --runInBand` | passed, 34 suites / 212 tests |
+| `pnpm test:e2e` | passed, 1 suite / 3 tests |
+| `pnpm build` | passed |
+| `pnpm test:contracts` | passed, 2 TS tests / 2 Python tests |
+| `pnpm migration:validate` | passed, 21 migrations |
+| `ruff check .` | passed |
+| `python -m mypy .` | passed |
+| PowerShell health script | passed |
+
+Notes:
+
+- The literal command `pnpm test -- --runInBand` fails under this pnpm on Windows with `Unknown option: runInBand`; `pnpm run test -- --runInBand` is the working equivalent.
+- Plain `pytest -q` needs `PYTHONPATH=.` on this Windows machine; `pnpm test:contracts` now uses a working cross-platform command.
+- Bash/WSL is not installed on this machine, so PowerShell scripts were used for local script validation.
+
+## Live API Smoke
+
+Validated through the running Docker backend:
+
+- Register user
+- Create workspace
+- Create/list/archive concept
+- Create/update asset
+- List asset versions
+- Generate signed asset download URL
+
+## Feature Classification
+
+- Working: auth, organizations, workspaces, invitations, audit, notifications, usage, NATS, Redis, MinIO, health, Swagger, canvas route wiring, concepts CRUD/archive, asset metadata/signed URL path.
+- Partial: AI task lifecycle without real workers, Socket.IO multi-instance behavior, assets generation/variations, BPMN/PDF exports.
+- Worker-dependent: AI model execution, RAG, document extraction, research, media generation, BPMN/PDF export generation.
+- Optional disabled in core: FastAPI workers, Ollama, Elsa.
+
+## Remaining Risks
+
+- FastAPI workers are not present in this repository.
+- Ollama is optional and disabled in the core profile.
+- Multi-instance Socket.IO was not validated with two running backend instances.
+- Concept and asset generation requests create backend records, but completion requires external workers.
+- BPMN/PDF export endpoints create pipeline execution records; actual artifacts require external worker implementation.
+- The current Docker MinIO model uses the root account for backend access; add a dedicated service account before separating `MINIO_ROOT_PASSWORD` and `MINIO_SECRET_KEY`.

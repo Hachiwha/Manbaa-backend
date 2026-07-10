@@ -22,6 +22,10 @@ export class OllamaHealthIndicator {
 
   async check(): Promise<HealthCheckResponse> {
     const start = Date.now();
+    const enabled = this.configService.get<boolean>('ollama.enabled', false);
+    if (!enabled) {
+      return { status: 'up', details: { ollama: { status: 'disabled', latency_ms: 0, models_loaded: 0 } } };
+    }
     const url = this.configService.get<string>('ollama.url') || 'http://ollama:11434';
     
     try {

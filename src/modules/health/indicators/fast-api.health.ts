@@ -21,6 +21,10 @@ export class FastAPIHealthIndicator {
 
   async check(): Promise<HealthCheckResponse> {
     const start = Date.now();
+    const enabled = this.configService.get<boolean>('health.fastapiEnabled', false);
+    if (!enabled) {
+      return { status: 'up', details: { fastapi: { status: 'disabled', latency_ms: 0 } } };
+    }
     const url = this.configService.get<string>('health.fastapi');
     
     try {

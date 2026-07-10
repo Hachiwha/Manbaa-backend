@@ -144,8 +144,25 @@ export class HealthService implements OnModuleInit {
       fastapi: { status: this.mapStatus(fastAPIResult.details.fastapi.status), latency_ms: fastAPIResult.details.fastapi.latency_ms, error: fastAPIResult.details.fastapi.error },
       elsa: { status: this.mapStatus(elsaResult.details.elsa.status), latency_ms: elsaResult.details.elsa.latency_ms, error: elsaResult.details.elsa.error },
       redis: { status: this.mapStatus(redisResult.status), latency_ms: redisResult.latency_ms, error: 'error' in redisResult ? redisResult.error : undefined },
-      ...Object.fromEntries(workers.map((worker: any) => [`worker:${worker.workerType}`, { ...worker, status: worker.status === 'healthy' ? 'ok' : worker.status === 'degraded' || worker.status === 'stale' ? 'degraded' : 'down' }])),
+      ...Object.fromEntries(this.mapWorkerHealth(workers)),
     };
+  }
+
+  private mapWorkerHealth(workers: any[]) {
+    const fastapiEnabled = this.configService.get<boolean>('health.fastapiEnabled', false);
+    return workers.map((worker: any) => {
+      if (!fastapiEnabled) {
+        return [`worker:${worker.workerType}`, { ...worker, enabled: false, status: 'ok' }];
+      }
+      return [
+        `worker:${worker.workerType}`,
+        {
+          ...worker,
+          enabled: true,
+          status: worker.status === 'healthy' ? 'ok' : worker.status === 'degraded' || worker.status === 'stale' ? 'degraded' : 'down',
+        },
+      ];
+    });
   }
 
   private async checkPostgres(): Promise<{ status: string; latency_ms: number; error?: string }> {
@@ -206,7 +223,7 @@ export class HealthService implements OnModuleInit {
     try {
       await this.natsClient.subscribeDurable({
         subject: 'system.health.ping',
-        durableName: CONSUMERS.HEALTH_PING,
+        durableName: `${CONSUMERS.HEALTH_PING}-health-service`,
         handler: async (payload: Record<string, unknown>) => {
           this.logger.debug(`Received health ping: ${JSON.stringify(payload)}`);
           this.cache = {

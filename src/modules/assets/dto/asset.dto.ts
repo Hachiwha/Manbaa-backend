@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsObject, IsEnum, MinLength, MaxLength } from 'class-validator';
+import { IsInt, IsString, IsOptional, IsObject, IsEnum, IsUUID, Min, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AssetType } from '../entities/asset.entity';
 
@@ -17,6 +17,44 @@ export class CreateAssetDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  storageKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  mimeType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  fileSize?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  width?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  height?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  thumbnailKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  parentId?: string;
 }
 
 export class GenerateAssetDto {
@@ -46,6 +84,16 @@ export class UpdateAssetDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  storageKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  thumbnailKey?: string;
 }
 
 export class VariationsAssetDto {

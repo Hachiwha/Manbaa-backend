@@ -191,16 +191,28 @@ services:
       INTERNAL_AUTH_ISSUER: ${INTERNAL_AUTH_ISSUER:-nestjs-platform}
       INTERNAL_AUTH_AUDIENCE: ${INTERNAL_AUTH_AUDIENCE:-fastapi-workers}
       INTERNAL_AUTH_ALLOWED_SERVICES: ${INTERNAL_AUTH_ALLOWED_SERVICES:-ai-orchestrator,document-worker,research-worker,media-worker,export-worker}
+      INTERNAL_AUTH_TOKEN_TTL_SECONDS: ${INTERNAL_AUTH_TOKEN_TTL_SECONDS:-300}
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_USE_SSL: 'false'
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-change-me-minio-password}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-documents}
       MINIO_BUCKET_DOCUMENTS: ${MINIO_BUCKET_DOCUMENTS:-documents}
       MINIO_BUCKET_EXPORTS: ${MINIO_BUCKET_EXPORTS:-exports}
+      MINIO_BUCKET_SOURCES: ${MINIO_BUCKET_SOURCES:-workspace-sources}
+      MINIO_BUCKET_PREVIEWS: ${MINIO_BUCKET_PREVIEWS:-workspace-previews}
+      MINIO_BUCKET_ASSETS: ${MINIO_BUCKET_ASSETS:-workspace-assets}
+      MINIO_BUCKET_WORKSPACE_EXPORTS: ${MINIO_BUCKET_WORKSPACE_EXPORTS:-workspace-exports}
+      MINIO_BUCKET_SNAPSHOTS: ${MINIO_BUCKET_SNAPSHOTS:-workspace-snapshots}
+      MINIO_BUCKET_TEMP: ${MINIO_BUCKET_TEMP:-workspace-temp}
+      FASTAPI_ENABLED: ${FASTAPI_ENABLED:-false}
+      OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
+      ELSA_ENABLED: ${ELSA_ENABLED:-false}
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       FASTAPI_HEALTH_URL: ${FASTAPI_HEALTH_URL:-http://ai-service:8000/health}
       FASTAPI_INTERNAL_URL: ${FASTAPI_INTERNAL_URL:-http://ai-service:8000/internal}
+      ELSA_HEALTH_URL: ${ELSA_HEALTH_URL:-http://elsa-server:8080/health}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
       DEV_BYPASS_AUTH: ${DEV_BYPASS_AUTH:-false}
       THROTTLE_TTL: ${THROTTLE_TTL:-60}

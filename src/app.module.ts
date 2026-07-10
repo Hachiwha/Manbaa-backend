@@ -12,8 +12,11 @@ import { JwtAuthGuard } from './core/guards/jwt-auth.guard';
 import { RolesGuard } from './core/guards/roles.guard';
 import { LoggerModule } from './core/logger/logger.module';
 import { AIGatewayModule } from './modules/ai-gateway/ai-gateway.module';
+import { AssetsModule } from './modules/assets/assets.module';
+import { AuditModule } from './modules/audit/audit.module';
 import { CanvasModule } from './modules/canvas/canvas.module';
 import { CommentsModule } from './modules/comments/comments.module';
+import { ConceptsModule } from './modules/concepts/concepts.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
 import { MessagesModule } from './modules/messages/messages.module';
@@ -75,8 +78,11 @@ import { InternalAuthModule } from './core/internal-auth/internal-auth.module';
     UsageModule,
     OutboxModule,
     JobsModule,
+    AuditModule,
     HealthModule,
     CanvasModule,
+    ConceptsModule,
+    AssetsModule,
     DocumentsModule,
     MessagesModule,
     OrganizationsModule,

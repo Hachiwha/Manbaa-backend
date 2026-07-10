@@ -4,6 +4,7 @@ ARG PNPM_VERSION=9.15.9
 FROM node:${NODE_VERSION}-alpine
 
 ARG PNPM_VERSION
+RUN apk add --no-cache python3 make g++
 RUN npm install --global pnpm@${PNPM_VERSION} \
     && pnpm --version \
     && node --version

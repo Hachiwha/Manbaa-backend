@@ -12,8 +12,8 @@ export class ConceptsController {
 
   @Get()
   @ApiOperation({ summary: 'List concepts in workspace' })
-  list(@Param('workspaceId', ParseUUIDPipe) workspaceId: string, @CurrentUser() user: { orgId: string }) {
-    return this.concepts.list(user.orgId, workspaceId);
+  list(@Param('workspaceId', ParseUUIDPipe) workspaceId: string, @CurrentUser() user: { orgId: string; id: string }) {
+    return this.concepts.list(user.orgId, workspaceId, user.id);
   }
 
   @Post()
@@ -30,8 +30,8 @@ export class ConceptsController {
 
   @Get(':conceptId')
   @ApiOperation({ summary: 'Get a concept' })
-  get(@Param('workspaceId', ParseUUIDPipe) workspaceId: string, @Param('conceptId', ParseUUIDPipe) conceptId: string, @CurrentUser() user: { orgId: string }) {
-    return this.concepts.get(user.orgId, workspaceId, conceptId);
+  get(@Param('workspaceId', ParseUUIDPipe) workspaceId: string, @Param('conceptId', ParseUUIDPipe) conceptId: string, @CurrentUser() user: { orgId: string; id: string }) {
+    return this.concepts.getForUser(user.orgId, workspaceId, conceptId, user.id);
   }
 
   @Patch(':conceptId')
@@ -56,5 +56,11 @@ export class ConceptsController {
   @ApiOperation({ summary: 'Reject a concept' })
   reject(@Param('workspaceId', ParseUUIDPipe) workspaceId: string, @Param('conceptId', ParseUUIDPipe) conceptId: string, @CurrentUser() user: { orgId: string; id: string }) {
     return this.concepts.reject(user.orgId, workspaceId, conceptId, user.id);
+  }
+
+  @Post(':conceptId/archive')
+  @ApiOperation({ summary: 'Archive a concept' })
+  archive(@Param('workspaceId', ParseUUIDPipe) workspaceId: string, @Param('conceptId', ParseUUIDPipe) conceptId: string, @CurrentUser() user: { orgId: string; id: string }) {
+    return this.concepts.archive(user.orgId, workspaceId, conceptId, user.id);
   }
 }

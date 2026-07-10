@@ -19,7 +19,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "typecheck": "tsc --noEmit",
-    "test:contracts": "jest src/core/messaging/domain-event.spec.ts --runInBand && PYTHONPATH=. pytest tests/contracts -q",
+    "test:contracts": "jest src/core/messaging/domain-event.spec.ts --runInBand && python -m pytest tests/contracts -q",
     "test:e2e": "jest --config ./tests/jest-e2e.config.js --runInBand",
     "migration:validate": "tsc --noEmit && node scripts/validate-migrations.js",
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",

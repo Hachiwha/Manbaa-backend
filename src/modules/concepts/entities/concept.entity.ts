@@ -9,6 +9,7 @@ export enum ConceptStatus {
   EVALUATED = 'evaluated',
   APPROVED = 'approved',
   REJECTED = 'rejected',
+  ARCHIVED = 'archived',
 }
 
 @Entity('concept')
