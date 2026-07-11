@@ -2,6 +2,7 @@ import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { AuditModule } from "../audit/audit.module";
+import { AiTask } from "../jobs/entities/ai-task.entity";
 import { JobsModule } from "../jobs/jobs.module";
 import { OutboxModule } from "../outbox/outbox.module";
 import { RealtimeModule } from "../realtime/realtime.module";
@@ -39,6 +40,7 @@ import { CanvasSnapshotSerializer } from "./services/canvas-snapshot-serializer.
       CanvasVersion,
       AiPreviewSnapshot,
       CanvasAiSuggestion,
+      AiTask,
       Workflow,
       WorkflowVersion,
     ]),

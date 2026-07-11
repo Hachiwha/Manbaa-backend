@@ -26,10 +26,14 @@ const validEnv = {
   MINIO_BUCKET_WORKSPACE_EXPORTS: 'workspace-exports',
   MINIO_BUCKET_SNAPSHOTS: 'workspace-snapshots',
   MINIO_BUCKET_TEMP: 'workspace-temp',
+  AI_ENABLED: false,
+  AI_ORCHESTRATOR_ENABLED: false,
+  DOCUMENT_WORKER_ENABLED: false,
+  MEDIA_WORKER_ENABLED: false,
+  RESEARCH_WORKER_ENABLED: false,
+  EXPORT_WORKER_ENABLED: false,
   FASTAPI_ENABLED: false,
-  OLLAMA_ENABLED: false,
   ELSA_ENABLED: false,
-  OLLAMA_URL: 'http://localhost:11434',
   FASTAPI_HEALTH_URL: 'http://localhost:8000/health',
   FASTAPI_INTERNAL_URL: 'http://localhost:8000/internal',
   FASTAPI_URL: '',
@@ -85,5 +89,74 @@ describe('envSchema', () => {
     );
 
     expect(result.error?.message).toContain('CANVAS_AI_MAX_DEBOUNCE_MS');
+  });
+
+  it('rejects missing JWT refresh secret', () => {
+    const env = { ...validEnv };
+    delete env.JWT_REFRESH_SECRET;
+
+    const result = envSchema.validate(env, { abortEarly: false });
+
+    expect(result.error?.message).toContain('JWT_REFRESH_SECRET');
+  });
+
+  it('accepts AI_ENABLED without per-worker flags', () => {
+    const env = { ...validEnv, AI_ENABLED: true };
+    delete (env as any).AI_ORCHESTRATOR_ENABLED;
+    delete (env as any).DOCUMENT_WORKER_ENABLED;
+    delete (env as any).MEDIA_WORKER_ENABLED;
+    delete (env as any).RESEARCH_WORKER_ENABLED;
+    delete (env as any).EXPORT_WORKER_ENABLED;
+
+    const result = envSchema.validate(env, { abortEarly: false });
+
+    expect(result.error).toBeUndefined();
+    expect(result.value.AI_ENABLED).toBe(true);
+    expect(result.value.AI_ORCHESTRATOR_ENABLED).toBe(false);
+  });
+
+  it('accepts AI_ENABLED with explicit per-worker flags', () => {
+    const env = {
+      ...validEnv,
+      AI_ENABLED: true,
+      AI_ORCHESTRATOR_ENABLED: true,
+      DOCUMENT_WORKER_ENABLED: true,
+      MEDIA_WORKER_ENABLED: false,
+      RESEARCH_WORKER_ENABLED: true,
+      EXPORT_WORKER_ENABLED: false,
+    };
+
+    const result = envSchema.validate(env, { abortEarly: false });
+
+    expect(result.error).toBeUndefined();
+    expect(result.value.AI_ORCHESTRATOR_ENABLED).toBe(true);
+    expect(result.value.DOCUMENT_WORKER_ENABLED).toBe(true);
+    expect(result.value.MEDIA_WORKER_ENABLED).toBe(false);
+    expect(result.value.RESEARCH_WORKER_ENABLED).toBe(true);
+    expect(result.value.EXPORT_WORKER_ENABLED).toBe(false);
+  });
+
+  it('rejects missing JWT secrets with clear messages', () => {
+    const env = { ...validEnv };
+    delete (env as any).JWT_ACCESS_SECRET;
+    delete (env as any).JWT_REFRESH_SECRET;
+    delete (env as any).INTERNAL_AUTH_SECRET;
+
+    const result = envSchema.validate(env, { abortEarly: false });
+
+    expect(result.error?.message).toContain('JWT_ACCESS_SECRET');
+    expect(result.error?.message).toContain('JWT_REFRESH_SECRET');
+    expect(result.error?.message).toContain('INTERNAL_AUTH_SECRET');
+  });
+
+  it('does not leak secret values in validation errors', () => {
+    const env = { ...validEnv };
+    delete env.NODE_ENV;
+
+    const result = envSchema.validate(env, { abortEarly: false });
+
+    expect(result.error?.message).not.toContain('access-secret');
+    expect(result.error?.message).not.toContain('minio-secret');
+    expect(result.error?.message).not.toContain('internal-secret');
   });
 });

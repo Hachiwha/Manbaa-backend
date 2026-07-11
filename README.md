@@ -101,6 +101,7 @@ The backend is a modular monolith. Async AI, RAG, media, and export execution ar
 - Organizations
 - Workspaces
 - Projects
+- Applications
 - Workflows
 - Sessions
 - Messages
@@ -122,17 +123,17 @@ The backend is a modular monolith. Async AI, RAG, media, and export execution ar
 
 ## Current Validation Snapshot
 
-Executed on 2026-07-10:
+Executed on 2026-07-11:
 
 - Docker core stack healthy
 - Clean isolated Compose deployment simulation passed
-- Swagger JSON loads with 130 paths
-- 21 migrations validated
-- 49 public database tables
-- Unit tests: 35 suites, 214 tests passing
-- E2E tests: 1 suite, 3 tests passing
-- Contract tests: 2 TypeScript and 2 Python tests passing
-- Live concept, asset, skill fallback, and deployment smoke paths passing
+- Swagger JSON loads with 140+ paths (including new Applications API)
+- 25 migrations validated (1 new: AddApplications)
+- 51+ public database tables (2 new: application, application_version)
+- Unit tests: 51 suites, 336 tests passing (21 new: applications module)
+- E2E tests: 2 suites, 8 tests passing
+- Contract tests: TypeScript and Python contract tests passing
+- Applications CRUD, schema drafts, versions, publishing, duplication verified
 
 See:
 

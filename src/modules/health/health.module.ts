@@ -3,7 +3,6 @@ import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { FastAPIHealthIndicator } from './indicators/fast-api.health';
-import { OllamaHealthIndicator } from './indicators/ollama.health';
 import { MinIOHealthIndicator } from './indicators/minio.health';
 import { NatsHealthIndicator } from './indicators/nats.health';
 import { ElsaHealthIndicator } from './indicators/elsa.health';
@@ -18,7 +17,6 @@ import { WorkerHeartbeatService } from './worker-heartbeat.service';
   providers: [
     HealthService,
     FastAPIHealthIndicator,
-    OllamaHealthIndicator,
     MinIOHealthIndicator,
     NatsHealthIndicator,
     ElsaHealthIndicator,

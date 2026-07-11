@@ -37,6 +37,7 @@ import { OutboxModule } from "./modules/outbox/outbox.module";
 import { RedisModule } from "./infra/redis/redis.module";
 import { WorkspaceStorageModule } from "./infra/storage/workspace-storage.module";
 import { InternalAuthModule } from "./core/internal-auth/internal-auth.module";
+import { ApplicationsModule } from "./modules/applications/applications.module";
 import { SourcesModule } from "./modules/sources/sources.module";
 
 @Module({
@@ -88,6 +89,7 @@ import { SourcesModule } from "./modules/sources/sources.module";
     MessagesModule,
     OrganizationsModule,
     ProjectsModule,
+    ApplicationsModule,
     AIGatewayModule,
     CommentsModule,
     RealtimeModule,

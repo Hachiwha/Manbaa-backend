@@ -197,10 +197,14 @@ services:
       MINIO_BUCKET_WORKSPACE_EXPORTS: ${MINIO_BUCKET_WORKSPACE_EXPORTS:-workspace-exports}
       MINIO_BUCKET_SNAPSHOTS: ${MINIO_BUCKET_SNAPSHOTS:-workspace-snapshots}
       MINIO_BUCKET_TEMP: ${MINIO_BUCKET_TEMP:-workspace-temp}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_ORCHESTRATOR_ENABLED: ${AI_ORCHESTRATOR_ENABLED:-false}
+      DOCUMENT_WORKER_ENABLED: ${DOCUMENT_WORKER_ENABLED:-false}
+      MEDIA_WORKER_ENABLED: ${MEDIA_WORKER_ENABLED:-false}
+      RESEARCH_WORKER_ENABLED: ${RESEARCH_WORKER_ENABLED:-false}
+      EXPORT_WORKER_ENABLED: ${EXPORT_WORKER_ENABLED:-false}
       FASTAPI_ENABLED: ${FASTAPI_ENABLED:-false}
-      OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
       ELSA_ENABLED: ${ELSA_ENABLED:-false}
-      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       FASTAPI_HEALTH_URL: ${FASTAPI_HEALTH_URL:-http://ai-service:8000/health}
       FASTAPI_INTERNAL_URL: ${FASTAPI_INTERNAL_URL:-http://ai-service:8000/internal}
       ELSA_HEALTH_URL: ${ELSA_HEALTH_URL:-http://elsa-server:8080/health}
@@ -217,34 +221,6 @@ services:
       retries: 18
       start_period: 30s
     restart: unless-stopped
-
-  # ─── Ollama ───────────────────────────────────────────────────────
-  ollama:
-    image: ollama/ollama:0.5.4
-    profiles: ['ai', 'full']
-    ports:
-      - '${OLLAMA_PORT:-11434}:11434'
-    volumes:
-      - ollama-models:/root/.ollama
-    restart: unless-stopped
-    healthcheck:
-      test: ['CMD-SHELL', 'ollama list 2>/dev/null || exit 1']
-      interval: 30s
-      timeout: 10s
-      retries: 6
-      start_period: 60s
-
-  ollama-init:
-    image: ollama/ollama:0.5.4
-    profiles: ['ai', 'full']
-    depends_on:
-      ollama:
-        condition: service_healthy
-    volumes:
-      - ollama-models:/root/.ollama
-      - ./infra/ollama-pull.sh:/pull.sh:ro
-    entrypoint: ['sh', '/pull.sh']
-    restart: 'no'
 
   # ─── Elsa (Legacy) ────────────────────────────────────────────────
   elsa-server:
@@ -274,4 +250,3 @@ volumes:
   nats-data:
   minio-data:
   redis-data:
-  ollama-models:

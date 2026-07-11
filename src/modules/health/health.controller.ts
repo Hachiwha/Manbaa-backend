@@ -35,13 +35,6 @@ export class HealthController {
   }
 
   @Roles('Admin')
-  @Get('ollama')
-  @HttpCode(HttpStatus.OK)
-  async checkOllama() {
-    return this.healthService.checkOllama();
-  }
-
-  @Roles('Admin')
   @Get('pgvector')
   @HttpCode(HttpStatus.OK)
   async checkPgVector() {

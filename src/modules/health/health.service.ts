@@ -5,7 +5,6 @@ import { NatsClientService } from '../../infra/nats/nats.client';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CONSUMERS } from '../../core/messaging';
 import { FastAPIHealthIndicator } from './indicators/fast-api.health';
-import { OllamaHealthIndicator } from './indicators/ollama.health';
 import { MinIOHealthIndicator } from './indicators/minio.health';
 import { NatsHealthIndicator } from './indicators/nats.health';
 import { ElsaHealthIndicator } from './indicators/elsa.health';
@@ -38,7 +37,6 @@ export class HealthService implements OnModuleInit {
     private readonly natsClient: NatsClientService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly fastAPIHealthIndicator: FastAPIHealthIndicator,
-    private readonly ollamaHealthIndicator: OllamaHealthIndicator,
     private readonly minIOHealthIndicator: MinIOHealthIndicator,
     private readonly natsHealthIndicator: NatsHealthIndicator,
     private readonly elsaHealthIndicator: ElsaHealthIndicator,
@@ -118,7 +116,6 @@ export class HealthService implements OnModuleInit {
       pgVectorResult,
       natsResult,
       minIOResult,
-      ollamaResult,
       fastAPIResult,
       elsaResult,
       redisResult,
@@ -128,7 +125,6 @@ export class HealthService implements OnModuleInit {
       this.pgVectorHealthIndicator.check(),
       this.natsHealthIndicator.check(),
       this.minIOHealthIndicator.check(),
-      this.ollamaHealthIndicator.check(),
       this.fastAPIHealthIndicator.check(),
       this.elsaHealthIndicator.check(),
       this.redisService.health().catch(error => ({ status: 'down', latency_ms: 0, error: error.message })),
@@ -140,7 +136,6 @@ export class HealthService implements OnModuleInit {
       pgvector: { status: this.mapStatus(pgVectorResult.details.pgvector.status), latency_ms: pgVectorResult.details.pgvector.latency_ms, version: pgVectorResult.details.pgvector.version, error: pgVectorResult.details.pgvector.error },
       nats: { status: this.mapStatus(natsResult.details.nats.status), latency_ms: natsResult.details.nats.latency_ms, jetstream: natsResult.details.nats.jetstream, error: natsResult.details.nats.error },
       minio: { status: this.mapStatus(minIOResult.details.minio.status), latency_ms: minIOResult.details.minio.latency_ms, error: minIOResult.details.minio.error },
-      ollama: { status: this.mapStatus(ollamaResult.details.ollama.status), latency_ms: ollamaResult.details.ollama.latency_ms, models_loaded: ollamaResult.details.ollama.models_loaded, error: ollamaResult.details.ollama.error },
       fastapi: { status: this.mapStatus(fastAPIResult.details.fastapi.status), latency_ms: fastAPIResult.details.fastapi.latency_ms, error: fastAPIResult.details.fastapi.error },
       elsa: { status: this.mapStatus(elsaResult.details.elsa.status), latency_ms: elsaResult.details.elsa.latency_ms, error: elsaResult.details.elsa.error },
       redis: { status: this.mapStatus(redisResult.status), latency_ms: redisResult.latency_ms, error: 'error' in redisResult ? redisResult.error : undefined },
@@ -149,9 +144,10 @@ export class HealthService implements OnModuleInit {
   }
 
   private mapWorkerHealth(workers: any[]) {
-    const fastapiEnabled = this.configService.get<boolean>('health.fastapiEnabled', false);
+    const aiEnabled = this.configService.get<boolean>('ai.enabled', false);
     return workers.map((worker: any) => {
-      if (!fastapiEnabled) {
+      const workerEnabled = this.configService.get<boolean>(`ai.${worker.workerType.replace(/-/g, '')}Enabled`, false);
+      if (!aiEnabled || !workerEnabled) {
         return [`worker:${worker.workerType}`, { ...worker, enabled: false, status: 'ok' }];
       }
       return [
@@ -247,16 +243,6 @@ export class HealthService implements OnModuleInit {
       status: result.details.fastapi.status,
       latency_ms: result.details.fastapi.latency_ms,
       details: result.details.fastapi,
-    };
-  }
-
-  async checkOllama(): Promise<{ status: string; latency_ms: number; models_loaded?: number; details?: unknown }> {
-    const result = await this.ollamaHealthIndicator.check();
-    return {
-      status: result.details.ollama.status,
-      latency_ms: result.details.ollama.latency_ms,
-      models_loaded: result.details.ollama.models_loaded,
-      details: result.details.ollama,
     };
   }
 

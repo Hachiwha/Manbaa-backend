@@ -2,14 +2,17 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { validate as validateUuid, v5 as uuidv5 } from 'uuid';
 
 import { RequestContextService } from '../../../core/context/request-context.service';
@@ -79,10 +82,12 @@ const ACTIVE_PREVIEW_STATUSES = [
 export class CanvasAiPreviewService {
   private readonly logger = new Logger(CanvasAiPreviewService.name);
 
+  private readonly aiEnabled: boolean;
+
   constructor(
     @InjectRepository(AiTask)
     private readonly tasks: Repository<AiTask>,
-    private readonly dataSource: import('typeorm').DataSource,
+    @Inject(DataSource) private readonly dataSource: DataSource,
     private readonly permissions: WorkspacePermissionService,
     private readonly storage: WorkspaceStorageService,
     private readonly serializer: CanvasSnapshotSerializer,
@@ -91,7 +96,10 @@ export class CanvasAiPreviewService {
     private readonly context: RequestContextService,
     private readonly realtime: CanvasRealtimeService,
     private readonly coordinator: CanvasAiPreviewCoordinator,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.aiEnabled = configService.get<boolean>('ai.enabled') === true;
+  }
 
   async createExplicit(
     workspaceId: string,
@@ -153,6 +161,12 @@ export class CanvasAiPreviewService {
     }
     if (dto.auto_apply !== false) {
       throw new BadRequestException('auto_apply must be false');
+    }
+    if (!this.aiEnabled) {
+      throw new ServiceUnavailableException({
+        code: 'AI_SERVICE_DISABLED',
+        message: 'AI generation is disabled in this environment',
+      });
     }
     const target = this.normalizeTarget(dto);
     this.assertLockedEditableDisjoint(target);

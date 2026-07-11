@@ -35,12 +35,16 @@ export default () => ({
     bucketSnapshots: process.env.MINIO_BUCKET_SNAPSHOTS,
     bucketTemp: process.env.MINIO_BUCKET_TEMP,
   },
-  ollama: {
-    enabled: process.env.OLLAMA_ENABLED === 'true',
-    url: process.env.OLLAMA_URL,
+  ai: {
+    enabled: process.env.AI_ENABLED === 'true',
+    orchestratorEnabled: process.env.AI_ORCHESTRATOR_ENABLED === 'true' || process.env.AI_ENABLED === 'true',
+    documentWorkerEnabled: process.env.DOCUMENT_WORKER_ENABLED === 'true' || process.env.AI_ENABLED === 'true',
+    mediaWorkerEnabled: process.env.MEDIA_WORKER_ENABLED === 'true' || process.env.AI_ENABLED === 'true',
+    researchWorkerEnabled: process.env.RESEARCH_WORKER_ENABLED === 'true' || process.env.AI_ENABLED === 'true',
+    exportWorkerEnabled: process.env.EXPORT_WORKER_ENABLED === 'true' || process.env.AI_ENABLED === 'true',
   },
   health: {
-    fastapiEnabled: process.env.FASTAPI_ENABLED === 'true',
+    fastapiEnabled: process.env.FASTAPI_ENABLED === 'true' || process.env.AI_ORCHESTRATOR_ENABLED === 'true' || process.env.AI_ENABLED === 'true',
     fastapi: process.env.FASTAPI_HEALTH_URL,
     fastapiInternal:
       process.env.FASTAPI_INTERNAL_URL ||

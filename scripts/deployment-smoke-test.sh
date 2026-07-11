@@ -1,104 +1,234 @@
-#!/usr/bin/env sh
-set -eu
+#!/usr/bin/env bash
+# Deployment smoke test for the FlowForge backend.
+#
+# Prerequisites:
+#   - The backend must be running (e.g. via `docker compose --profile core up -d`)
+#   - curl and jq must be installed
+#
+# Usage:
+#   ./scripts/deployment-smoke-test.sh [BASE_URL]
+#   Default BASE_URL: http://localhost:3000
 
-ENV_FILE="${1:-.env}"
-BASE_URL="${BASE_URL:-http://localhost:3000}"
-PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
+set -euo pipefail
 
-compose() {
-  if [ -n "$PROJECT_NAME" ]; then
-    docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" "$@"
+BASE_URL="${1:-http://localhost:3000}"
+API="${BASE_URL}/api"
+PASS=0
+FAIL=0
+
+# Colours
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+pass() { PASS=$((PASS + 1)); echo -e "  ${GREEN}✓${NC} $1"; }
+fail() { FAIL=$((FAIL + 1)); echo -e "  ${RED}✕${NC} $1"; }
+
+assert_status() {
+  local desc="$1" expected="$2" actual="$3"
+  if [ "$actual" -eq "$expected" ]; then
+    pass "$desc"
   else
-    docker compose --env-file "$ENV_FILE" "$@"
+    fail "$desc (expected $expected, got $actual)"
   fi
 }
 
-wait_http_ok() {
-  url="$1"
-  attempts="${2:-60}"
-  i=1
-  while [ "$i" -le "$attempts" ]; do
-    if curl --max-time 10 -fsS "$url" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 2
-    i=$((i + 1))
-  done
-  echo "Timed out waiting for $url" >&2
-  return 1
-}
+echo "=== FlowForge Deployment Smoke Test ==="
+echo "Base URL: ${BASE_URL}"
+echo ""
 
-json_get() {
-  path="$1"
-  file="$2"
-  node -e "
-const fs = require('fs');
-const path = process.argv[1].split('.');
-let value = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-for (const part of path) value = value?.[part];
-if (value === undefined || value === null) process.exit(2);
-process.stdout.write(String(value));
-" "$path" "$file"
-}
+# ── 1. Health ping ──────────────────────────────────────────────────
+echo "--- Health ---"
+ping_code=$(curl -s -o /dev/null -w '%{http_code}' "${API}/health/ping" 2>/dev/null || echo "000")
+assert_status "health ping returns 200" 200 "$ping_code"
 
-command -v docker >/dev/null 2>&1 || { echo "Docker CLI is not available." >&2; exit 1; }
-command -v node >/dev/null 2>&1 || { echo "Node.js is not available." >&2; exit 1; }
-command -v curl >/dev/null 2>&1 || { echo "curl is not available." >&2; exit 1; }
+ping_body=$(curl -s "${API}/health/ping" 2>/dev/null || echo "{}")
+ping_pong=$(echo "$ping_body" | jq -r '.pong // "false"')
+if [ "$ping_pong" = "true" ]; then
+  pass "health ping body contains pong: true"
+else
+  fail "health ping body missing pong: true (got $ping_pong)"
+fi
 
-[ -f "$ENV_FILE" ] || { echo "Missing $ENV_FILE." >&2; exit 1; }
+# ── 2. Liveness ─────────────────────────────────────────────────────
+liveness_code=$(curl -s -o /dev/null -w '%{http_code}' "${API}/health/live" 2>/dev/null || echo "000")
+assert_status "liveness returns 200" 200 "$liveness_code"
 
-sh scripts/validate-env.sh "$ENV_FILE"
-compose config --quiet
-compose --profile core up -d
+# ── 3. Readiness ────────────────────────────────────────────────────
+readiness_code=$(curl -s -o /dev/null -w '%{http_code}' "${API}/health/ready" 2>/dev/null || echo "000")
+assert_status "readiness returns 200" 200 "$readiness_code"
 
-wait_http_ok "$BASE_URL/api/health/ready"
-curl --max-time 10 -fsS "$BASE_URL/api/health/live" >/dev/null
-curl --max-time 10 -fsS "$BASE_URL/api/health/ping" >/dev/null
-curl --max-time 10 -fsS "$BASE_URL/api/health" >/dev/null
-
-compose exec -T postgres psql -U app -d appdb -c "SELECT 1;" >/dev/null
-compose exec -T nats wget -qO- http://localhost:8222/healthz >/dev/null
-compose exec -T redis redis-cli ping | grep -q PONG
-compose exec -T minio curl -fsS http://localhost:9000/minio/health/live >/dev/null
-
-stamp="$(date +%Y%m%d%H%M%S)"
-email="deployment-smoke-${stamp}-$$@example.com"
-password="SmokeTestPassword123!"
-tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
-
-register_body="$tmpdir/register-body.json"
-register_response="$tmpdir/register-response.json"
-workspace_body="$tmpdir/workspace-body.json"
-workspace_response="$tmpdir/workspace-response.json"
-task_body="$tmpdir/task-body.json"
-task_response="$tmpdir/task-response.json"
-
-printf '{"email":"%s","password":"%s"}' "$email" "$password" > "$register_body"
-curl --max-time 20 -fsS -X POST "$BASE_URL/api/v1/auth/register" \
+# ── 4. Auth (development mode) ──────────────────────────────────────
+echo "--- Auth ---"
+# Registration
+reg_body='{"email":"smoke-test@example.com","password":"SmokeTestPass1!"}'
+reg_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
   -H 'Content-Type: application/json' \
-  --data-binary "@$register_body" > "$register_response"
+  -d "$reg_body" \
+  "${API}/v1/auth/register" 2>/dev/null || echo "000")
+if [ "$reg_code" -eq 201 ] || [ "$reg_code" -eq 409 ]; then
+  pass "registration (201 created or 409 duplicate)"
+else
+  fail "registration unexpected status $reg_code"
+fi
 
-access_token="$(json_get accessToken "$register_response")"
-organization_id="$(json_get organization.id "$register_response")"
-
-printf '{"name":"Deployment smoke %s","description":"Automated deployment smoke test"}' "$stamp" > "$workspace_body"
-curl --max-time 20 -fsS -X POST "$BASE_URL/api/v1/workspaces?organizationId=$organization_id" \
-  -H "Authorization: Bearer $access_token" \
+# Login
+login_body='{"email":"smoke-test@example.com","password":"SmokeTestPass1!"}'
+login_resp=$(curl -s -X POST \
   -H 'Content-Type: application/json' \
-  --data-binary "@$workspace_body" > "$workspace_response"
+  -d "$login_body" \
+  "${API}/v1/auth/login" 2>/dev/null || echo "{}")
+ACCESS_TOKEN=$(echo "$login_resp" | jq -r '.accessToken // ""')
+if [ -n "$ACCESS_TOKEN" ]; then
+  pass "login returns an access token"
+else
+  fail "login did not return access token"
+fi
 
-workspace_id="$(json_get id "$workspace_response")"
-
-printf '{"taskType":"chat","payload":{"message":"deployment smoke test"},"idempotencyKey":"deployment-smoke-%s"}' "$stamp" > "$task_body"
-curl --max-time 20 -fsS -X POST "$BASE_URL/api/v1/workspaces/$workspace_id/ai/tasks" \
-  -H "Authorization: Bearer $access_token" \
+# ── 5. Project creation ─────────────────────────────────────────────
+echo "--- Project ---"
+SMOKE_SUFFIX="$(date +%s)-$$"
+project_body="{\"name\":\"Smoke Test Project ${SMOKE_SUFFIX}\"}"
+project_resp=$(curl -s -X POST \
   -H 'Content-Type: application/json' \
-  --data-binary "@$task_body" > "$task_response"
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d "$project_body" \
+  "${API}/projects" 2>/dev/null || echo "{}")
+PROJECT_ID=$(echo "$project_resp" | jq -r '.project?.id // .id // ""')
+if [ -n "$PROJECT_ID" ]; then
+  pass "project created (id: ${PROJECT_ID})"
+else
+  PROJECT_ID="550e8400-e29b-41d4-a716-446655440000"  # fallback UUID for e2e
+  fail "project creation returned no id"
+fi
 
-task_id="$(json_get id "$task_response")"
-curl --max-time 20 -fsS -X POST "$BASE_URL/api/v1/workspaces/$workspace_id/ai/tasks/$task_id/cancel" \
-  -H "Authorization: Bearer $access_token" >/dev/null
+# ── 6. Application CRUD ─────────────────────────────────────────────
+echo "--- Application ---"
+# Create
+app_body="{\"name\":\"Smoke Test App ${SMOKE_SUFFIX}\",\"projectId\":\"${PROJECT_ID}\"}"
+app_resp=$(curl -s -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d "$app_body" \
+  "${API}/projects/${PROJECT_ID}/applications" 2>/dev/null || echo "{}")
+APP_ID=$(echo "$app_resp" | jq -r '.application?.id // ""')
+if [ -n "$APP_ID" ]; then
+  pass "application created (id: ${APP_ID})"
+else
+  APP_ID="550e8400-e29b-41d4-a716-446655440001"
+  fail "application creation returned no id"
+fi
 
-echo "Deployment smoke test passed."
-echo "Validated health, PostgreSQL, NATS, Redis, MinIO, auth registration, workspace creation, and AI task cancel."
+# Retrieve
+get_code=$(curl -s -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}" 2>/dev/null || echo "000")
+assert_status "application retrieval" 200 "$get_code"
+
+# ── 7. Schema save (valid) ──────────────────────────────────────────
+echo "--- Schema ---"
+# Read current schemaRevision from the app
+app_get=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}" 2>/dev/null || echo "{}")
+EXPECTED_REV=$(echo "$app_get" | jq -r '.application?.schemaRevision // .schemaRevision // 1')
+schema_body="{\"schema\":{\"pages\":[{\"id\":\"page-1\",\"name\":\"Home\",\"route\":\"/\",\"root\":{\"id\":\"root-1\",\"type\":\"page\"}}],\"components\":[],\"dataSources\":[],\"actions\":[],\"navigation\":[]},\"expectedRevision\":${EXPECTED_REV}}"
+schema_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d "$schema_body" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}/schema" 2>/dev/null || echo "000")
+assert_status "valid schema save" 200 "$schema_code"
+
+# ── 8. Schema save (invalid) ────────────────────────────────────────
+echo "--- Schema validation ---"
+# Read updated schemaRevision
+app_get2=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}" 2>/dev/null || echo "{}")
+EXPECTED_REV=$(echo "$app_get2" | jq -r '.application?.schemaRevision // .schemaRevision // 2')
+# Send a schema with pages set to a non-array (triggers validation error)
+invalid_body="{\"schema\":{\"pages\":\"not-an-array\"},\"expectedRevision\":${EXPECTED_REV}}"
+invalid_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d "$invalid_body" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}/schema" 2>/dev/null || echo "000")
+assert_status "invalid schema rejected (400)" 400 "$invalid_code"
+
+# ── 9. Version creation ─────────────────────────────────────────────
+echo "--- Version ---"
+version_body='{"schemaVersion":"1.0.0","schema":{"pages":[]}}'
+version_resp=$(curl -s -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d "$version_body" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}/versions" 2>/dev/null || echo "{}")
+VERSION_ID=$(echo "$version_resp" | jq -r '.version?.id // ""')
+if [ -n "$VERSION_ID" ]; then
+  pass "version created (id: ${VERSION_ID})"
+else
+  VERSION_ID="550e8400-e29b-41d4-a716-446655440002"
+  fail "version creation returned no id"
+fi
+
+# Version listing
+list_code=$(curl -s -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}/versions" 2>/dev/null || echo "000")
+assert_status "version listing" 200 "$list_code"
+
+# ── 10. Publication ─────────────────────────────────────────────────
+echo "--- Publication ---"
+publish_body="{\"versionId\":\"${VERSION_ID}\"}"
+publish_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d "$publish_body" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}/publish" 2>/dev/null || echo "000")
+assert_status "publication" 200 "$publish_code"
+
+# Published version retrieval
+pub_get_code=$(curl -s -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}/published" 2>/dev/null || echo "000")
+assert_status "published version retrieval" 200 "$pub_get_code"
+
+# ── 11. Duplication ─────────────────────────────────────────────────
+echo "--- Duplication ---"
+dup_body="{\"name\":\"Duplicated App ${SMOKE_SUFFIX}\"}"
+dup_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d "$dup_body" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}/duplicate" 2>/dev/null || echo "000")
+assert_status "duplication (201)" 201 "$dup_code"
+
+# ── 12. Archive ─────────────────────────────────────────────────────
+echo "--- Archive ---"
+archive_code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}" 2>/dev/null || echo "000")
+assert_status "archive (204)" 204 "$archive_code"
+
+# ── 13. Archived mutation rejection ─────────────────────────────────
+echo "--- Post-archive guard ---"
+after_archive_code=$(curl -s -o /dev/null -w '%{http_code}' -X PATCH \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d '{"name":"Should Fail"}' \
+  "${API}/projects/${PROJECT_ID}/applications/${APP_ID}" 2>/dev/null || echo "000")
+if [ "$after_archive_code" -ge 400 ]; then
+  pass "archived mutation rejected ($after_archive_code)"
+else
+  fail "archived mutation should have been rejected but got $after_archive_code"
+fi
+
+# ── Summary ─────────────────────────────────────────────────────────
+echo ""
+echo "=== Results ==="
+echo "  Passed: ${PASS}"
+echo "  Failed: ${FAIL}"
+echo ""
+
+if [ "$FAIL" -gt 0 ]; then
+  exit 1
+fi

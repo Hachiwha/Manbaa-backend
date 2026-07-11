@@ -1,4 +1,4 @@
-export type ServiceName = 'nestjs' | 'fastapi' | 'ollama' | 'elsa' | 'postgres' | 'nats' | 'minio';
+export type ServiceName = 'nestjs' | 'fastapi' | 'elsa' | 'postgres' | 'nats' | 'minio';
 export type ServiceStatus = 'ok' | 'degraded' | 'down';
 
 export interface SystemHealthPingEvent {

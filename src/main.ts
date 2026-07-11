@@ -69,6 +69,7 @@ async function bootstrap() {
       .addTag('documents', 'Document management')
       .addTag('comments', 'Comments')
       .addTag('canvas', 'Canvas & visual workflow editor')
+      .addTag('applications', 'Visual application builder')
       .build();
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('docs', app, document);
