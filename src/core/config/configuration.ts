@@ -54,5 +54,12 @@ export default () => ({
     ttl: parseInt(process.env.THROTTLE_TTL, 10) || 60,
     limit: parseInt(process.env.THROTTLE_LIMIT, 10) || 120,
   },
+  canvasAi: {
+    autoPreviewEnabled:
+      process.env.CANVAS_AI_AUTO_PREVIEW_ENABLED === 'true',
+    debounceMs: parseInt(process.env.CANVAS_AI_DEBOUNCE_MS, 10) || 3_000,
+    maxDebounceMs:
+      parseInt(process.env.CANVAS_AI_MAX_DEBOUNCE_MS, 10) || 15_000,
+  },
   logLevel: process.env.LOG_LEVEL || 'info',
 });

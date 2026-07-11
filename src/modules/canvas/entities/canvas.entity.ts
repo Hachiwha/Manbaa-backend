@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -25,6 +26,13 @@ import {
  * No data would be lost and no FK relationships would need restructuring.
  */
 @Entity("canvas")
+@Check("ck_canvas_revision_nonnegative", "revision >= 0")
+@Check("ck_canvas_width_bounded", "width BETWEEN 1 AND 65536")
+@Check("ck_canvas_height_bounded", "height BETWEEN 1 AND 65536")
+@Check(
+  "ck_canvas_background_color",
+  "background ~ '^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$'",
+)
 export class Canvas {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -32,6 +40,26 @@ export class Canvas {
   @Column({ type: "uuid" })
   @Index("idx_canvas_workflow")
   workflowId: string;
+
+  /**
+   * Legacy canvases predate workspaces, so this starts nullable. Phase 04 binds
+   * a canvas to exactly one workspace before creating an AI snapshot.
+   */
+  @Column({ name: "workspace_id", type: "uuid", nullable: true })
+  @Index("idx_canvas_workspace")
+  workspaceId: string | null;
+
+  @Column({ type: "bigint", default: 0 })
+  revision: number;
+
+  @Column({ type: "integer", default: 1440 })
+  width: number;
+
+  @Column({ type: "integer", default: 1024 })
+  height: number;
+
+  @Column({ type: "varchar", length: 9, default: "#FFFFFF" })
+  background: string;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;

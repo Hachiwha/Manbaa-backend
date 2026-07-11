@@ -1,0 +1,36 @@
+{
+  "event_id": "10000000-0000-4000-8000-000000000001",
+  "event_type": "workspace.canvas.ai.preview.requested",
+  "occurred_at": "2026-07-11T12:00:00.000Z",
+  "organization_id": "10000000-0000-4000-8000-000000000002",
+  "workspace_id": "10000000-0000-4000-8000-000000000003",
+  "project_id": "10000000-0000-4000-8000-000000000004",
+  "correlation_id": "10000000-0000-4000-8000-000000000005",
+  "causation_id": "10000000-0000-4000-8000-000000000006",
+  "actor": {
+    "type": "user",
+    "id": "10000000-0000-4000-8000-000000000007"
+  },
+  "payload": {
+    "task_id": "10000000-0000-4000-8000-000000000008",
+    "canvas_id": "10000000-0000-4000-8000-000000000009",
+    "canvas_revision": 148,
+    "snapshot_id": "10000000-0000-4000-8000-000000000010",
+    "snapshot_version": 19,
+    "storage_bucket": "workspace-snapshots",
+    "storage_key": "organizations/10000000-0000-4000-8000-000000000002/workspaces/10000000-0000-4000-8000-000000000003/canvases/10000000-0000-4000-8000-000000000009/snapshots/10000000-0000-4000-8000-000000000010/snapshot-v19.json",
+    "checksum_sha256": "63bc82fd261288f1b65492d393d90e56227b65b95d57bf0b89f9b91e76906544",
+    "preview_status": "pending",
+    "preview_bucket": null,
+    "preview_key": null,
+    "preview_checksum_sha256": null,
+    "operation": "improve_selection",
+    "selected_element_ids": ["hero-title"],
+    "locked_element_ids": ["logo-mark"],
+    "editable_element_ids": ["hero-title"],
+    "source_ids": ["10000000-0000-4000-8000-000000000011"],
+    "user_prompt": "Make this section more professional",
+    "desired_width": 520,
+    "desired_height": 320
+  }
+}

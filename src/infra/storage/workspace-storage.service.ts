@@ -24,6 +24,14 @@ export interface WorkspaceObjectContext {
   workspaceId: string;
 }
 
+export interface StoredWorkspaceSnapshot {
+  bucket: string;
+  key: string;
+  checksumSha256: string;
+  contentType: "application/json";
+  sizeBytes: number;
+}
+
 @Injectable()
 export class WorkspaceStorageService implements OnModuleInit {
   private readonly client: Client;
@@ -76,6 +84,14 @@ export class WorkspaceStorageService implements OnModuleInit {
     return this.buckets.sources;
   }
 
+  getSnapshotBucket(): WorkspaceBucket {
+    return this.buckets.snapshots;
+  }
+
+  getPreviewBucket(): WorkspaceBucket {
+    return this.buckets.previews;
+  }
+
   buildWorkspaceObjectPath(
     ctx: WorkspaceObjectContext,
     entityType: string,
@@ -116,6 +132,52 @@ export class WorkspaceStorageService implements OnModuleInit {
       this.validateSegment(part);
     }
     return `organizations/${ctx.organizationId}/workspaces/${ctx.workspaceId}/sources/${sourceId}/versions/${sourceVersionId}/${filename}`;
+  }
+
+  buildSnapshotObjectPath(
+    ctx: WorkspaceObjectContext,
+    canvasId: string,
+    snapshotId: string,
+    snapshotVersion: number,
+  ): string {
+    this.validatePositiveVersion(snapshotVersion);
+    for (const part of [
+      "organizations",
+      ctx.organizationId,
+      "workspaces",
+      ctx.workspaceId,
+      "canvases",
+      canvasId,
+      "snapshots",
+      snapshotId,
+      `snapshot-v${snapshotVersion}.json`,
+    ]) {
+      this.validateSegment(part);
+    }
+    return `organizations/${ctx.organizationId}/workspaces/${ctx.workspaceId}/canvases/${canvasId}/snapshots/${snapshotId}/snapshot-v${snapshotVersion}.json`;
+  }
+
+  buildPreviewObjectPath(
+    ctx: WorkspaceObjectContext,
+    canvasId: string,
+    snapshotId: string,
+    snapshotVersion: number,
+  ): string {
+    this.validatePositiveVersion(snapshotVersion);
+    for (const part of [
+      "organizations",
+      ctx.organizationId,
+      "workspaces",
+      ctx.workspaceId,
+      "canvases",
+      canvasId,
+      "snapshots",
+      snapshotId,
+      `preview-v${snapshotVersion}.png`,
+    ]) {
+      this.validateSegment(part);
+    }
+    return `organizations/${ctx.organizationId}/workspaces/${ctx.workspaceId}/canvases/${canvasId}/snapshots/${snapshotId}/preview-v${snapshotVersion}.png`;
   }
 
   validateWorkspaceObjectPath(
@@ -271,6 +333,37 @@ export class WorkspaceStorageService implements OnModuleInit {
     return { bucket, key: validatedKey, checksumSha256 };
   }
 
+  async storeSnapshot(
+    ctx: WorkspaceObjectContext,
+    canvasId: string,
+    snapshotId: string,
+    snapshotVersion: number,
+    content: Buffer,
+  ): Promise<StoredWorkspaceSnapshot> {
+    const bucket = this.getSnapshotBucket();
+    const key = this.buildSnapshotObjectPath(
+      ctx,
+      canvasId,
+      snapshotId,
+      snapshotVersion,
+    );
+    const validatedKey = this.validateWorkspaceObjectPath(ctx, bucket, key);
+    const checksumSha256 = createHash("sha256").update(content).digest("hex");
+
+    await this.client.putObject(bucket, validatedKey, content, content.length, {
+      "Content-Type": "application/json",
+      "x-amz-meta-checksum-sha256": checksumSha256,
+    });
+
+    return {
+      bucket,
+      key: validatedKey,
+      checksumSha256,
+      contentType: "application/json",
+      sizeBytes: content.length,
+    };
+  }
+
   private allowedBuckets() {
     return Object.values(this.buckets);
   }
@@ -286,6 +379,14 @@ export class WorkspaceStorageService implements OnModuleInit {
       this.hasControlCharacter(decoded)
     ) {
       throw new BadRequestException("Invalid path segment");
+    }
+  }
+
+  private validatePositiveVersion(version: number): void {
+    if (!Number.isSafeInteger(version) || version <= 0) {
+      throw new BadRequestException(
+        "Snapshot version must be a positive integer",
+      );
     }
   }
 

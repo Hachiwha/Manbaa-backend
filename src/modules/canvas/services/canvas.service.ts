@@ -1,15 +1,19 @@
 import {
+  BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, EntityManager, Repository } from "typeorm";
+import { isDeepStrictEqual } from "util";
 
 import { ActorType, UserRole } from "../../../database/enums";
 import { AuditService } from "../../audit/audit.service";
 import { Workflow } from "../../workflows/entities/workflow.entity";
 import { WorkflowVersion } from "../../workflows/entities/workflow-version.entity";
+import { WorkspacePermissionService } from "../../workspaces/workspace-permission.service";
 import { CanvasRealtimeService } from "./canvas-realtime.service";
 import { Canvas } from "../entities/canvas.entity";
 import { CanvasObject } from "../entities/canvas-object.entity";
@@ -24,6 +28,7 @@ import {
   CreateCanvasSnapshotDto,
   CommitCanvasDto,
   CanvasOperationFilterDto,
+  MAX_CANVAS_OPERATION_PAYLOAD_BYTES,
 } from "../dto/canvas.dto";
 
 type RequestUser = {
@@ -31,6 +36,12 @@ type RequestUser = {
   orgId: string;
   role: string;
 };
+
+class CanvasRevisionConflict extends Error {
+  constructor(readonly currentRevision: number) {
+    super("Canvas revision conflict");
+  }
+}
 
 @Injectable()
 export class CanvasService {
@@ -52,6 +63,7 @@ export class CanvasService {
     private readonly dataSource: DataSource,
     private readonly auditService: AuditService,
     private readonly realtime: CanvasRealtimeService,
+    private readonly workspacePermissions: WorkspacePermissionService,
   ) {}
 
   // ─── Canvas ───────────────────────────────────────────────────────
@@ -107,37 +119,41 @@ export class CanvasService {
     caller: RequestUser,
   ): Promise<CanvasObject> {
     const canvas = await this.getOrCreateCanvas(workflowId, caller.orgId);
+    await this.requireCanvasMutationPermission(canvas, caller);
 
-    const obj = this.canvasObjectRepository.create({
-      canvasId: canvas.id,
-      type: dto.type,
-      elsaType: dto.elsa_type ?? null,
-      label: dto.label ?? null,
-      properties: dto.properties ?? {},
-      positionX: dto.position_x,
-      positionY: dto.position_y,
-      width: dto.width ?? null,
-      height: dto.height ?? null,
-      style: dto.style ?? null,
-      isLocked: false,
-      createdBy: caller.id,
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const lockedCanvas = await this.lockCanvas(manager, canvas.id);
+      const object = manager.create(CanvasObject, {
+        canvasId: canvas.id,
+        type: dto.type,
+        elsaType: dto.elsa_type ?? null,
+        label: dto.label ?? null,
+        properties: dto.properties ?? {},
+        positionX: dto.position_x,
+        positionY: dto.position_y,
+        width: dto.width ?? null,
+        height: dto.height ?? null,
+        style: dto.style ?? null,
+        isLocked: false,
+        createdBy: caller.id,
+      });
+      const savedObject = await manager.save(object);
+      await this.appendOperationWithLockedCanvas(
+        manager,
+        lockedCanvas,
+        savedObject.id,
+        caller.id,
+        "object_create",
+        {
+          type: savedObject.type,
+          elsa_type: savedObject.elsaType,
+          label: savedObject.label,
+          position_x: savedObject.positionX,
+          position_y: savedObject.positionY,
+        },
+      );
+      return savedObject;
     });
-
-    const saved = await this.canvasObjectRepository.save(obj);
-
-    await this.appendOperation(
-      canvas.id,
-      saved.id,
-      caller.id,
-      "object_create",
-      {
-        type: saved.type,
-        elsa_type: saved.elsaType,
-        label: saved.label,
-        position_x: saved.positionX,
-        position_y: saved.positionY,
-      },
-    );
 
     await this.auditService.log({
       workflowId,
@@ -159,48 +175,58 @@ export class CanvasService {
     dto: UpdateCanvasObjectDto,
     caller: RequestUser,
   ): Promise<CanvasObject> {
-    const obj = await this.findObjectInOrgOrThrow(objectId, caller.orgId);
+    const existing = await this.findObjectInOrgOrThrow(objectId, caller.orgId);
+    const canvas = await this.findCanvasOrThrow(existing.canvasId);
+    await this.requireCanvasMutationPermission(canvas, caller);
 
-    if (obj.isLocked && caller.role !== UserRole.ADMIN) {
-      throw new ForbiddenException("Cannot modify a locked object");
-    }
-
-    const beforeState = {
-      label: obj.label,
-      position_x: obj.positionX,
-      position_y: obj.positionY,
-      width: obj.width,
-      height: obj.height,
-    };
-
-    if (dto.label !== undefined) obj.label = dto.label;
-    if (dto.elsa_type !== undefined) obj.elsaType = dto.elsa_type;
-    if (dto.properties !== undefined) obj.properties = dto.properties;
-    if (dto.position_x !== undefined) obj.positionX = dto.position_x;
-    if (dto.position_y !== undefined) obj.positionY = dto.position_y;
-    if (dto.width !== undefined) obj.width = dto.width;
-    if (dto.height !== undefined) obj.height = dto.height;
-    if (dto.style !== undefined) obj.style = dto.style;
-
-    const saved = await this.canvasObjectRepository.save(obj);
-
-    await this.appendOperation(
-      obj.canvasId,
-      saved.id,
-      caller.id,
-      "object_update",
-      {
-        label: saved.label,
-        position_x: saved.positionX,
-        position_y: saved.positionY,
-        width: saved.width,
-        height: saved.height,
+    const { saved, beforeState } = await this.dataSource.transaction(
+      async (manager) => {
+        const lockedCanvas = await this.lockCanvas(manager, canvas.id);
+        const object = await manager.findOne(CanvasObject, {
+          where: { id: objectId, canvasId: canvas.id },
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!object) throw new NotFoundException("Canvas object not found");
+        if (object.isLocked && caller.role !== UserRole.ADMIN) {
+          throw new ForbiddenException("Cannot modify a locked object");
+        }
+        const original = {
+          label: object.label,
+          position_x: object.positionX,
+          position_y: object.positionY,
+          width: object.width,
+          height: object.height,
+        };
+        if (dto.label !== undefined) object.label = dto.label;
+        if (dto.elsa_type !== undefined) object.elsaType = dto.elsa_type;
+        if (dto.properties !== undefined) object.properties = dto.properties;
+        if (dto.position_x !== undefined) object.positionX = dto.position_x;
+        if (dto.position_y !== undefined) object.positionY = dto.position_y;
+        if (dto.width !== undefined) object.width = dto.width;
+        if (dto.height !== undefined) object.height = dto.height;
+        if (dto.style !== undefined) object.style = dto.style;
+        const savedObject = await manager.save(object);
+        await this.appendOperationWithLockedCanvas(
+          manager,
+          lockedCanvas,
+          savedObject.id,
+          caller.id,
+          "object_update",
+          {
+            label: savedObject.label,
+            position_x: savedObject.positionX,
+            position_y: savedObject.positionY,
+            width: savedObject.width,
+            height: savedObject.height,
+          },
+        );
+        return { saved: savedObject, beforeState: original };
       },
     );
 
     await this.auditService.log({
       workflowId:
-        (await this.resolveWorkflowId(obj.canvasId, caller.orgId)) ??
+        (await this.resolveWorkflowId(existing.canvasId, caller.orgId)) ??
         undefined,
       actorId: caller.id,
       actorType: ActorType.USER,
@@ -215,8 +241,8 @@ export class CanvasService {
     });
 
     this.realtime.broadcastObjectUpdated(
-      obj.canvasId,
-      (await this.resolveWorkflowId(obj.canvasId, caller.orgId))!,
+      existing.canvasId,
+      (await this.resolveWorkflowId(existing.canvasId, caller.orgId))!,
       saved,
     );
 
@@ -228,36 +254,46 @@ export class CanvasService {
     dto: MoveCanvasObjectDto,
     caller: RequestUser,
   ): Promise<CanvasObject> {
-    const obj = await this.findObjectInOrgOrThrow(objectId, caller.orgId);
+    const existing = await this.findObjectInOrgOrThrow(objectId, caller.orgId);
+    const canvas = await this.findCanvasOrThrow(existing.canvasId);
+    await this.requireCanvasMutationPermission(canvas, caller);
 
-    if (obj.isLocked && caller.role !== UserRole.ADMIN) {
-      throw new ForbiddenException("Cannot move a locked object");
-    }
-
-    const beforeState = {
-      position_x: obj.positionX,
-      position_y: obj.positionY,
-    };
-
-    obj.positionX = dto.position_x;
-    obj.positionY = dto.position_y;
-
-    const saved = await this.canvasObjectRepository.save(obj);
-
-    await this.appendOperation(
-      obj.canvasId,
-      saved.id,
-      caller.id,
-      "object_move",
-      {
-        position_x: saved.positionX,
-        position_y: saved.positionY,
+    const { saved, beforeState } = await this.dataSource.transaction(
+      async (manager) => {
+        const lockedCanvas = await this.lockCanvas(manager, canvas.id);
+        const object = await manager.findOne(CanvasObject, {
+          where: { id: objectId, canvasId: canvas.id },
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!object) throw new NotFoundException("Canvas object not found");
+        if (object.isLocked && caller.role !== UserRole.ADMIN) {
+          throw new ForbiddenException("Cannot move a locked object");
+        }
+        const original = {
+          position_x: object.positionX,
+          position_y: object.positionY,
+        };
+        object.positionX = dto.position_x;
+        object.positionY = dto.position_y;
+        const savedObject = await manager.save(object);
+        await this.appendOperationWithLockedCanvas(
+          manager,
+          lockedCanvas,
+          savedObject.id,
+          caller.id,
+          "object_move",
+          {
+            position_x: savedObject.positionX,
+            position_y: savedObject.positionY,
+          },
+        );
+        return { saved: savedObject, beforeState: original };
       },
     );
 
     await this.auditService.log({
       workflowId:
-        (await this.resolveWorkflowId(obj.canvasId, caller.orgId)) ??
+        (await this.resolveWorkflowId(existing.canvasId, caller.orgId)) ??
         undefined,
       actorId: caller.id,
       actorType: ActorType.USER,
@@ -271,8 +307,8 @@ export class CanvasService {
     });
 
     this.realtime.broadcastObjectMoved(
-      obj.canvasId,
-      (await this.resolveWorkflowId(obj.canvasId, caller.orgId))!,
+      existing.canvasId,
+      (await this.resolveWorkflowId(existing.canvasId, caller.orgId))!,
       saved,
     );
 
@@ -283,27 +319,34 @@ export class CanvasService {
     objectId: string,
     caller: RequestUser,
   ): Promise<{ deleted: boolean }> {
-    const obj = await this.findObjectInOrgOrThrow(objectId, caller.orgId);
+    const existing = await this.findObjectInOrgOrThrow(objectId, caller.orgId);
+    const canvas = await this.findCanvasOrThrow(existing.canvasId);
+    await this.requireCanvasMutationPermission(canvas, caller);
 
-    if (obj.isLocked && caller.role !== UserRole.ADMIN) {
-      throw new ForbiddenException("Cannot delete a locked object");
-    }
-
-    await this.appendOperation(
-      obj.canvasId,
-      objectId,
-      caller.id,
-      "object_delete",
-      {
-        type: obj.type,
-        label: obj.label,
-      },
-    );
-
-    await this.canvasObjectRepository.remove(obj);
+    const deleted = await this.dataSource.transaction(async (manager) => {
+      const lockedCanvas = await this.lockCanvas(manager, canvas.id);
+      const object = await manager.findOne(CanvasObject, {
+        where: { id: objectId, canvasId: canvas.id },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!object) throw new NotFoundException("Canvas object not found");
+      if (object.isLocked && caller.role !== UserRole.ADMIN) {
+        throw new ForbiddenException("Cannot delete a locked object");
+      }
+      await manager.remove(object);
+      await this.appendOperationWithLockedCanvas(
+        manager,
+        lockedCanvas,
+        objectId,
+        caller.id,
+        "object_delete",
+        { type: object.type, label: object.label },
+      );
+      return object;
+    });
 
     const deletedWorkflowId = await this.resolveWorkflowId(
-      obj.canvasId,
+      deleted.canvasId,
       caller.orgId,
     );
 
@@ -313,12 +356,12 @@ export class CanvasService {
       actorType: ActorType.USER,
       eventType: "CANVAS_OBJECT_DELETED",
       elementId: objectId,
-      beforeState: { type: obj.type, label: obj.label },
+      beforeState: { type: deleted.type, label: deleted.label },
       afterState: null,
     });
 
     this.realtime.broadcastObjectDeleted(
-      obj.canvasId,
+      deleted.canvasId,
       deletedWorkflowId!,
       objectId,
     );
@@ -349,19 +392,18 @@ export class CanvasService {
     opPayload: Record<string, unknown>,
     versionVector?: Record<string, unknown>,
   ): Promise<CanvasOperation> {
-    const nextSeq = await this.nextSequenceNumber(canvasId);
-
-    const op = this.canvasOperationRepository.create({
-      canvasId,
-      canvasObjectId,
-      userId,
-      opType,
-      opPayload,
-      versionVector: versionVector ?? null,
-      sequenceNumber: nextSeq,
+    return this.dataSource.transaction(async (manager) => {
+      const canvas = await this.lockCanvas(manager, canvasId);
+      return this.appendOperationWithLockedCanvas(
+        manager,
+        canvas,
+        canvasObjectId,
+        userId,
+        opType,
+        opPayload,
+        versionVector,
+      );
     });
-
-    return this.canvasOperationRepository.save(op);
   }
 
   async createOperation(
@@ -370,17 +412,115 @@ export class CanvasService {
     caller: RequestUser,
   ): Promise<CanvasOperation> {
     const canvas = await this.getOrCreateCanvas(workflowId, caller.orgId);
+    await this.requireCanvasMutationPermission(canvas, caller);
+    this.assertOperationPayloadBounded(dto.op_payload);
 
-    const op = await this.appendOperation(
-      canvas.id,
-      dto.canvas_object_id ?? null,
-      caller.id,
-      dto.op_type,
-      dto.op_payload,
-      dto.version_vector,
-    );
+    try {
+      const result = await this.dataSource.transaction(async (manager) => {
+        const locked = await manager.findOne(Canvas, {
+          where: { id: canvas.id },
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!locked) throw new NotFoundException("Canvas not found");
 
-    return op;
+        const existing = await manager.findOne(CanvasOperation, {
+          where: { id: dto.operation_id },
+        });
+        if (existing) {
+          const sameLogicalOperation =
+            existing.canvasId === canvas.id &&
+            existing.canvasObjectId === (dto.canvas_object_id ?? null) &&
+            existing.userId === caller.id &&
+            existing.opType === dto.op_type &&
+            Number(existing.sequenceNumber) === dto.client_revision + 1 &&
+            existing.organizationId === caller.orgId &&
+            existing.workspaceId === canvas.workspaceId &&
+            Number(existing.clientRevision) === dto.client_revision &&
+            isDeepStrictEqual(existing.opPayload, dto.op_payload) &&
+            isDeepStrictEqual(
+              existing.versionVector,
+              dto.version_vector ?? null,
+            );
+          if (!sameLogicalOperation) {
+            throw new ConflictException(
+              "Operation ID is already used by a different operation",
+            );
+          }
+          return { operation: existing, duplicate: true, canvas: locked };
+        }
+
+        const currentRevision = Number(locked.revision);
+        if (dto.client_revision !== currentRevision) {
+          throw new CanvasRevisionConflict(currentRevision);
+        }
+
+        if (dto.canvas_object_id) {
+          const objectExists = await manager.exists(CanvasObject, {
+            where: { id: dto.canvas_object_id, canvasId: canvas.id },
+          });
+          if (!objectExists) {
+            throw new BadRequestException(
+              "Canvas object does not belong to this canvas",
+            );
+          }
+        }
+
+        const nextRevision = currentRevision + 1;
+        const operation = manager.create(CanvasOperation, {
+          id: dto.operation_id,
+          canvasId: canvas.id,
+          organizationId: caller.orgId,
+          workspaceId: locked.workspaceId,
+          canvasObjectId: dto.canvas_object_id ?? null,
+          userId: caller.id,
+          opType: dto.op_type,
+          opPayload: dto.op_payload,
+          versionVector: dto.version_vector ?? null,
+          sequenceNumber: nextRevision,
+          clientRevision: dto.client_revision,
+        });
+        const saved = await manager.save(operation);
+        locked.revision = nextRevision;
+        await manager.save(locked);
+        return { operation: saved, duplicate: false, canvas: locked };
+      });
+
+      if (!result.duplicate && result.canvas.workspaceId) {
+        this.realtime.broadcastOperationAccepted({
+          organization_id: caller.orgId,
+          workspace_id: result.canvas.workspaceId,
+          canvas_id: canvas.id,
+          operation_id: result.operation.id,
+          actor_id: caller.id,
+          canvas_revision: Number(result.operation.sequenceNumber),
+          occurred_at:
+            result.operation.createdAt?.toISOString() ?? new Date().toISOString(),
+        });
+      }
+      return result.operation;
+    } catch (error) {
+      if (error instanceof CanvasRevisionConflict) {
+        if (canvas.workspaceId) {
+          this.realtime.broadcastOperationRejected({
+            organization_id: caller.orgId,
+            workspace_id: canvas.workspaceId,
+            canvas_id: canvas.id,
+            operation_id: dto.operation_id,
+            actor_id: caller.id,
+            client_revision: dto.client_revision,
+            current_revision: error.currentRevision,
+            code: "CANVAS_REVISION_CONFLICT",
+            occurred_at: new Date().toISOString(),
+          });
+        }
+        throw new ConflictException({
+          code: "CANVAS_REVISION_CONFLICT",
+          message: "Canvas revision is stale",
+          currentRevision: error.currentRevision,
+        });
+      }
+      throw error;
+    }
   }
 
   async getOperationHistory(
@@ -659,6 +799,63 @@ export class CanvasService {
     return obj;
   }
 
+  private async findCanvasOrThrow(canvasId: string): Promise<Canvas> {
+    const canvas = await this.canvasRepository.findOne({
+      where: { id: canvasId },
+    });
+    if (!canvas) throw new NotFoundException("Canvas not found");
+    return canvas;
+  }
+
+  private async lockCanvas(
+    manager: EntityManager,
+    canvasId: string,
+  ): Promise<Canvas> {
+    const canvas = await manager.findOne(Canvas, {
+      where: { id: canvasId },
+      lock: { mode: "pessimistic_write" },
+    });
+    if (!canvas) throw new NotFoundException("Canvas not found");
+    return canvas;
+  }
+
+  private async appendOperationWithLockedCanvas(
+    manager: EntityManager,
+    canvas: Canvas,
+    canvasObjectId: string | null,
+    userId: string,
+    opType: string,
+    opPayload: Record<string, unknown>,
+    versionVector?: Record<string, unknown>,
+  ): Promise<CanvasOperation> {
+    const clientRevision = Number(canvas.revision);
+    const workflow = canvas.workspaceId
+      ? await manager.findOne(Workflow, {
+          where: { id: canvas.workflowId },
+          select: { id: true, orgId: true },
+        })
+      : null;
+    if (canvas.workspaceId && !workflow) {
+      throw new NotFoundException("Canvas workflow not found");
+    }
+    const operation = manager.create(CanvasOperation, {
+      canvasId: canvas.id,
+      organizationId: workflow?.orgId ?? null,
+      workspaceId: canvas.workspaceId,
+      canvasObjectId,
+      userId,
+      opType,
+      opPayload,
+      versionVector: versionVector ?? null,
+      sequenceNumber: clientRevision + 1,
+      clientRevision: canvas.workspaceId ? clientRevision : null,
+    });
+    const saved = await manager.save(operation);
+    canvas.revision = clientRevision + 1;
+    await manager.save(canvas);
+    return saved;
+  }
+
   private async resolveWorkflowId(
     canvasId: string,
     orgId: string,
@@ -684,14 +881,36 @@ export class CanvasService {
     return row[0].id as string;
   }
 
-  private async nextSequenceNumber(canvasId: string): Promise<number> {
-    const result = await this.canvasOperationRepository
-      .createQueryBuilder("op")
-      .select("COALESCE(MAX(op.sequence_number), 0)", "maxSeq")
-      .where("op.canvas_id = :canvasId", { canvasId })
-      .getRawOne<{ maxSeq: string }>();
+  private async requireCanvasMutationPermission(
+    canvas: Canvas,
+    caller: RequestUser,
+  ): Promise<void> {
+    if (canvas.workspaceId) {
+      await this.workspacePermissions.requireEditor(
+        caller.id,
+        canvas.workspaceId,
+        caller.orgId,
+      );
+      return;
+    }
 
-    return Number(result?.maxSeq ?? 0) + 1;
+    const legacyMutationRoles: string[] = [
+      UserRole.ADMIN,
+      UserRole.PROCESS_OWNER,
+      UserRole.BUSINESS_ANALYST,
+    ];
+    if (!legacyMutationRoles.includes(caller.role)) {
+      throw new ForbiddenException("Canvas mutation access denied");
+    }
+  }
+
+  private assertOperationPayloadBounded(payload: Record<string, unknown>): void {
+    const sizeBytes = Buffer.byteLength(JSON.stringify(payload), "utf8");
+    if (sizeBytes > MAX_CANVAS_OPERATION_PAYLOAD_BYTES) {
+      throw new BadRequestException(
+        `Canvas operation payload exceeds ${MAX_CANVAS_OPERATION_PAYLOAD_BYTES} bytes`,
+      );
+    }
   }
 
   private buildSnapshotData(objects: CanvasObject[]): Record<string, unknown> {

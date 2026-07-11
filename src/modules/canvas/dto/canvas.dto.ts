@@ -1,6 +1,8 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
+  IsIn,
+  IsInt,
   IsEnum,
   IsNumber,
   IsObject,
@@ -8,7 +10,23 @@ import {
   IsString,
   IsUUID,
   Min,
+  MaxLength,
 } from "class-validator";
+
+export const CANVAS_OPERATION_TYPES = [
+  "object_create",
+  "object_move",
+  "object_resize",
+  "object_delete",
+  "object_relabel",
+  "property_update",
+  "edge_create",
+  "edge_delete",
+  "edge_reroute",
+  "bulk_paste",
+] as const;
+
+export const MAX_CANVAS_OPERATION_PAYLOAD_BYTES = 65_536;
 
 // ─── Canvas Object ─────────────────────────────────────────────────
 
@@ -124,6 +142,16 @@ export class MoveCanvasObjectDto {
 // ─── Canvas Operation ───────────────────────────────────────────────
 
 export class CreateCanvasOperationDto {
+  @ApiProperty({ format: "uuid", description: "Client-generated idempotency ID" })
+  @IsUUID()
+  operation_id: string;
+
+  @ApiProperty({ minimum: 0, description: "Last server revision observed by the client" })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  client_revision: number;
+
   @ApiProperty({ required: false, format: "uuid" })
   @IsOptional()
   @IsUUID()
@@ -134,6 +162,8 @@ export class CreateCanvasOperationDto {
       "Operation type: object_create, object_move, object_resize, object_delete, object_relabel, property_update, edge_create, edge_delete, edge_reroute, bulk_paste",
   })
   @IsString()
+  @IsIn(CANVAS_OPERATION_TYPES)
+  @MaxLength(64)
   op_type: string;
 
   @ApiProperty({ description: "The delta payload for this operation" })

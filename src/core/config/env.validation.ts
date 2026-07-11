@@ -48,5 +48,16 @@ export const envSchema = Joi.object({
   DEV_BYPASS_AUTH: Joi.boolean().default(false),
   THROTTLE_TTL: Joi.number().default(60),
   THROTTLE_LIMIT: Joi.number().default(120),
+  CANVAS_AI_AUTO_PREVIEW_ENABLED: Joi.boolean().default(false),
+  CANVAS_AI_DEBOUNCE_MS: Joi.number()
+    .integer()
+    .min(100)
+    .max(60_000)
+    .default(3_000),
+  CANVAS_AI_MAX_DEBOUNCE_MS: Joi.number()
+    .integer()
+    .min(Joi.ref('CANVAS_AI_DEBOUNCE_MS'))
+    .max(300_000)
+    .default(15_000),
   LOG_LEVEL: Joi.string().valid('trace', 'debug', 'info', 'warn', 'error').default('info'),
 });

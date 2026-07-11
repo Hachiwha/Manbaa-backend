@@ -6,6 +6,7 @@
     "workspace.source.process.requested", "workspace.source.processing", "workspace.source.extracted", "workspace.source.indexed", "workspace.source.failed",
     "workspace.research.requested", "workspace.research.progress", "workspace.research.completed", "workspace.research.failed",
     "workspace.canvas.analyze.requested", "workspace.canvas.analysis.completed",
+    "workspace.canvas.ai.preview.requested",
     "workspace.concept.generate.requested", "workspace.concept.generation.started", "workspace.concept.generation.progress", "workspace.concept.generated", "workspace.concept.generation.failed", "workspace.concept.evaluate.requested", "workspace.concept.evaluated",
     "workspace.asset.generate.requested", "workspace.asset.generation.started", "workspace.asset.generation.progress", "workspace.asset.generated", "workspace.asset.generation.failed", "workspace.asset.variations.requested",
     "workspace.export.requested", "workspace.export.started", "workspace.export.progress", "workspace.export.completed", "workspace.export.failed", "workspace.export.cancel.requested",

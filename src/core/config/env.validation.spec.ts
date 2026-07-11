@@ -35,6 +35,9 @@ const validEnv = {
   FASTAPI_URL: '',
   ELSA_HEALTH_URL: 'http://localhost:5000/health',
   CORS_ORIGIN: 'http://localhost:3001',
+  CANVAS_AI_AUTO_PREVIEW_ENABLED: false,
+  CANVAS_AI_DEBOUNCE_MS: 3000,
+  CANVAS_AI_MAX_DEBOUNCE_MS: 15000,
 };
 
 describe('envSchema', () => {
@@ -52,5 +55,35 @@ describe('envSchema', () => {
 
     expect(result.error).toBeUndefined();
     expect(result.value.NATS_STREAM_NAME).toBe('FLOWFORGE');
+  });
+
+  it('validates canvas AI debounce configuration', () => {
+    const result = envSchema.validate(
+      {
+        ...validEnv,
+        CANVAS_AI_AUTO_PREVIEW_ENABLED: 'true',
+        CANVAS_AI_DEBOUNCE_MS: 2_000,
+        CANVAS_AI_MAX_DEBOUNCE_MS: 10_000,
+      },
+      { abortEarly: false },
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.value.CANVAS_AI_AUTO_PREVIEW_ENABLED).toBe(true);
+    expect(result.value.CANVAS_AI_DEBOUNCE_MS).toBe(2_000);
+    expect(result.value.CANVAS_AI_MAX_DEBOUNCE_MS).toBe(10_000);
+  });
+
+  it('rejects a maximum debounce shorter than the normal debounce', () => {
+    const result = envSchema.validate(
+      {
+        ...validEnv,
+        CANVAS_AI_DEBOUNCE_MS: 5_000,
+        CANVAS_AI_MAX_DEBOUNCE_MS: 4_999,
+      },
+      { abortEarly: false },
+    );
+
+    expect(result.error?.message).toContain('CANVAS_AI_MAX_DEBOUNCE_MS');
   });
 });

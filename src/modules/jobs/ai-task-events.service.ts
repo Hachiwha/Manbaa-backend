@@ -45,18 +45,63 @@ export class AiTaskEventsService implements OnModuleInit {
     }
     const task = await this.tasks.findOne({ where: { id: event.payload.taskId, organizationId: event.organizationId, workspaceId: event.workspaceId } });
     if (!task) throw new Error('AI task scope mismatch');
+    let broadcastEvent = `ai.task.${kind}`;
+    let broadcastPayload: Record<string, unknown> = event.payload;
     if (kind === 'started') {
       if (task.status !== JobStatus.QUEUED) return;
       task.status = JobStatus.RUNNING; task.startedAt = new Date(); task.currentStep = event.payload.currentStep ?? null; await this.tasks.save(task);
     } else if (kind === 'progress') {
       if (![JobStatus.RUNNING, JobStatus.WAITING_FOR_USER].includes(task.status)) return;
       task.progress = Math.max(task.progress, Math.min(99, event.payload.progress ?? task.progress)); task.currentStep = event.payload.currentStep ?? task.currentStep; await this.tasks.save(task);
-    } else await this.finish(task, event, kind === 'completed');
-    this.broadcast(task, `ai.task.${kind}`, event.payload);
+    } else {
+      const outcome = await this.finish(task, event, kind === 'completed');
+      if (outcome === 'ignored') return;
+      if (outcome === 'stale') {
+        broadcastEvent = 'ai.task.stale';
+        broadcastPayload = {
+          taskId: task.id,
+          snapshotId: task.snapshotId,
+          canvasRevision: task.canvasRevision,
+          currentStep: 'stale_result_ignored',
+        };
+      }
+    }
+    this.broadcast(task, broadcastEvent, broadcastPayload);
   }
 
-  private async finish(task: AiTask, event: DomainEvent<TaskEventPayload>, success: boolean) {
-    if ([JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED].includes(task.status)) return;
+  private async finish(
+    task: AiTask,
+    event: DomainEvent<TaskEventPayload>,
+    success: boolean,
+  ): Promise<'finished' | 'ignored' | 'stale'> {
+    if (task.status === JobStatus.SUPERSEDED) {
+      task.status = JobStatus.STALE;
+      task.resultPayload = null;
+      task.errorCode = 'STALE_RESULT';
+      task.errorMessage = 'A late worker result was ignored after supersession';
+      task.completedAt = new Date();
+      await this.tasks.save(task);
+      await this.audit.createAuditLog({
+        organizationId: task.organizationId,
+        workspaceId: task.workspaceId,
+        actorId: task.userId,
+        action: 'ai_task.stale',
+        entityType: 'ai_task',
+        entityId: task.id,
+        after: { status: task.status },
+        correlationId: event.correlationId,
+      });
+      return 'stale';
+    }
+    if (
+      [
+        JobStatus.COMPLETED,
+        JobStatus.FAILED,
+        JobStatus.CANCELLED,
+        JobStatus.STALE,
+      ].includes(task.status)
+    )
+      return 'ignored';
     await this.db.transaction(async manager => {
       task.status = success ? JobStatus.COMPLETED : JobStatus.FAILED; task.progress = success ? 100 : task.progress;
       task.resultPayload = success ? event.payload.result ?? {} : null;
@@ -68,6 +113,7 @@ export class AiTaskEventsService implements OnModuleInit {
     });
     await this.notifications.createNotification({ organizationId: task.organizationId, workspaceId: task.workspaceId, userId: task.userId, type: success ? NotificationType.AI_TASK_COMPLETED : NotificationType.AI_TASK_FAILED, title: success ? 'AI task completed' : 'AI task failed', body: success ? 'Your AI task is ready.' : 'Your AI task could not be completed.', metadata: { taskId: task.id } });
     await this.audit.createAuditLog({ organizationId: task.organizationId, workspaceId: task.workspaceId, actorId: task.userId, action: success ? 'ai_task.completed' : 'ai_task.failed', entityType: 'ai_task', entityId: task.id, after: { status: task.status }, correlationId: event.correlationId });
+    return 'finished';
   }
 
   private broadcast(task: AiTask, event: string, payload: Record<string, unknown>) {

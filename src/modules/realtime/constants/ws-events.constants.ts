@@ -43,6 +43,11 @@ export const WS_EVENTS = {
   CANVAS_CURSOR: "canvas.cursor",
   CANVAS_PRESENCE_JOIN: "canvas.presence.join",
   CANVAS_PRESENCE_LEAVE: "canvas.presence.leave",
+  CANVAS_OPERATION_ACCEPTED: "canvas.operation.accepted",
+  CANVAS_OPERATION_REJECTED: "canvas.operation.rejected",
+  CANVAS_SNAPSHOT_CREATED: "canvas.snapshot.created",
+  CANVAS_AI_PREVIEW_QUEUED: "canvas.ai.preview.queued",
+  CANVAS_AI_PREVIEW_SUPERSEDED: "canvas.ai.preview.superseded",
 
   // Notification events
   NOTIFICATION_REVIEW_REQUEST: "notification.review_request",
@@ -53,6 +58,8 @@ export const WS_EVENTS = {
  */
 export const WS_ROOMS = {
   user: (userId: string) => `user:${userId}`,
+  organization: (organizationId: string) => `organization:${organizationId}`,
+  workspace: (workspaceId: string) => `workspace:${workspaceId}`,
   session: (sessionId: string) => `session:${sessionId}`,
   workflow: (workflowId: string) => `workflow:${workflowId}`,
   pipeline: (pipelineExecutionId: string) => `pipeline:${pipelineExecutionId}`,

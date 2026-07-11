@@ -33,6 +33,9 @@ export const SUBJECTS_V2 = {
   CANVAS_ANALYZE_REQUESTED: 'workspace.canvas.analyze.requested',
   CANVAS_ANALYSIS_COMPLETED: 'workspace.canvas.analysis.completed',
 
+  // Canvas AI preview
+  CANVAS_AI_PREVIEW_REQUESTED: 'workspace.canvas.ai.preview.requested',
+
   // Concept generation/evaluation
   CONCEPT_GENERATE_REQUESTED: 'workspace.concept.generate.requested',
   CONCEPT_GENERATION_STARTED: 'workspace.concept.generation.started',

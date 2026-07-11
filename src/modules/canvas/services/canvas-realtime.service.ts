@@ -12,6 +12,11 @@ import {
   CanvasCommittedPayload,
   CanvasCursorPayload,
   CanvasPresencePayload,
+  CanvasOperationAcceptedPayload,
+  CanvasOperationRejectedPayload,
+  CanvasSnapshotCreatedPayload,
+  CanvasAiPreviewQueuedPayload,
+  CanvasAiPreviewSupersededPayload,
 } from "../../realtime/interfaces/ws-payloads.interface";
 
 const CURSOR_THROTTLE_MS = 50;
@@ -125,6 +130,48 @@ export class CanvasRealtimeService {
     } satisfies CanvasCommittedPayload);
   }
 
+  broadcastOperationAccepted(payload: CanvasOperationAcceptedPayload): void {
+    this.emitCanvasEvent(
+      payload.canvas_id,
+      WS_EVENTS.CANVAS_OPERATION_ACCEPTED,
+      payload,
+    );
+  }
+
+  broadcastOperationRejected(payload: CanvasOperationRejectedPayload): void {
+    this.emitCanvasEvent(
+      payload.canvas_id,
+      WS_EVENTS.CANVAS_OPERATION_REJECTED,
+      payload,
+    );
+  }
+
+  broadcastSnapshotCreated(payload: CanvasSnapshotCreatedPayload): void {
+    this.emitCanvasEvent(
+      payload.canvas_id,
+      WS_EVENTS.CANVAS_SNAPSHOT_CREATED,
+      payload,
+    );
+  }
+
+  broadcastAiPreviewQueued(payload: CanvasAiPreviewQueuedPayload): void {
+    this.emitCanvasEvent(
+      payload.canvas_id,
+      WS_EVENTS.CANVAS_AI_PREVIEW_QUEUED,
+      payload,
+    );
+  }
+
+  broadcastAiPreviewSuperseded(
+    payload: CanvasAiPreviewSupersededPayload,
+  ): void {
+    this.emitCanvasEvent(
+      payload.canvas_id,
+      WS_EVENTS.CANVAS_AI_PREVIEW_SUPERSEDED,
+      payload,
+    );
+  }
+
   // ─── Cursor (throttled, ephemeral) ────────────────────────────────
 
   handleCursorUpdate(
@@ -218,5 +265,13 @@ export class CanvasRealtimeService {
     if (this.gateway.hasListeners(room)) {
       this.gateway.emitToRoom(room, event, payload);
     }
+  }
+
+  private emitCanvasEvent(
+    canvasId: string,
+    event: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.emitIfListeners(WS_ROOMS.canvas(canvasId), event, payload);
   }
 }

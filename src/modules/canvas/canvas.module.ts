@@ -5,6 +5,7 @@ import { AuditModule } from "../audit/audit.module";
 import { RealtimeModule } from "../realtime/realtime.module";
 import { Workflow } from "../workflows/entities/workflow.entity";
 import { WorkflowVersion } from "../workflows/entities/workflow-version.entity";
+import { WorkspacesModule } from "../workspaces/workspaces.module";
 import { Canvas } from "./entities/canvas.entity";
 import { CanvasObject } from "./entities/canvas-object.entity";
 import { CanvasOperation } from "./entities/canvas-operation.entity";
@@ -30,6 +31,7 @@ import { CanvasRealtimeService } from "./services/canvas-realtime.service";
     ]),
     AuditModule,
     RealtimeModule,
+    WorkspacesModule,
   ],
   controllers: [CanvasController, CanvasObjectController],
   providers: [CanvasService, CanvasRealtimeService],

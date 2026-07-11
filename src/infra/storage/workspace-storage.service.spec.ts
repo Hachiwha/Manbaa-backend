@@ -31,6 +31,22 @@ describe("WorkspaceStorageService path security", () => {
       "organizations/org/workspaces/ws/sources/source-id/versions/version-id/brief.txt",
     ));
 
+  it("builds canonical immutable snapshot and future preview paths", () => {
+    expect(
+      service.buildSnapshotObjectPath(ctx, "canvas-id", "snapshot-id", 19),
+    ).toBe(
+      "organizations/org/workspaces/ws/canvases/canvas-id/snapshots/snapshot-id/snapshot-v19.json",
+    );
+    expect(
+      service.buildPreviewObjectPath(ctx, "canvas-id", "snapshot-id", 19),
+    ).toBe(
+      "organizations/org/workspaces/ws/canvases/canvas-id/snapshots/snapshot-id/preview-v19.png",
+    );
+    expect(() =>
+      service.buildSnapshotObjectPath(ctx, "canvas-id", "snapshot-id", 0),
+    ).toThrow(BadRequestException);
+  });
+
   it.each([
     "../x",
     "%2e%2e/x",
@@ -81,5 +97,31 @@ describe("WorkspaceStorageService path security", () => {
         "text/plain",
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("stores a snapshot in the fixed snapshot bucket with exact-byte checksum", async () => {
+    const putObject = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(service, "client", {
+      value: { putObject },
+      configurable: true,
+    });
+    const content = Buffer.from('{"schema_version":"1"}', "utf8");
+
+    await expect(
+      service.storeSnapshot(ctx, "canvas-id", "snapshot-id", 19, content),
+    ).resolves.toEqual({
+      bucket: WORKSPACE_BUCKETS[4],
+      key: "organizations/org/workspaces/ws/canvases/canvas-id/snapshots/snapshot-id/snapshot-v19.json",
+      checksumSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      contentType: "application/json",
+      sizeBytes: content.length,
+    });
+    expect(putObject).toHaveBeenCalledWith(
+      WORKSPACE_BUCKETS[4],
+      "organizations/org/workspaces/ws/canvases/canvas-id/snapshots/snapshot-id/snapshot-v19.json",
+      content,
+      content.length,
+      expect.objectContaining({ "Content-Type": "application/json" }),
+    );
   });
 });

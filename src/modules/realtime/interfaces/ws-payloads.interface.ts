@@ -199,6 +199,54 @@ export interface CanvasPresencePayload {
   connection_count: number;
 }
 
+export interface CanvasEventScope {
+  [key: string]: unknown;
+  organization_id: string;
+  workspace_id: string;
+  canvas_id: string;
+}
+
+export interface CanvasOperationAcceptedPayload extends CanvasEventScope {
+  operation_id: string;
+  actor_id: string;
+  canvas_revision: number;
+  occurred_at: string;
+}
+
+export interface CanvasOperationRejectedPayload extends CanvasEventScope {
+  operation_id: string;
+  actor_id: string;
+  client_revision: number;
+  current_revision: number;
+  code: string;
+  occurred_at: string;
+}
+
+export interface CanvasSnapshotCreatedPayload extends CanvasEventScope {
+  task_id: string;
+  snapshot_id: string;
+  snapshot_version: number;
+  canvas_revision: number;
+  status: string;
+  created_at: string;
+}
+
+export interface CanvasAiPreviewQueuedPayload extends CanvasEventScope {
+  task_id: string;
+  snapshot_id: string;
+  snapshot_version: number;
+  canvas_revision: number;
+  status: string;
+}
+
+export interface CanvasAiPreviewSupersededPayload extends CanvasEventScope {
+  superseded_task_id: string;
+  superseded_snapshot_id: string;
+  replacement_task_id: string;
+  replacement_snapshot_id: string;
+  canvas_revision: number;
+}
+
 // ─── Room join request ──────────────────────────────────────────────
 
 export interface JoinRoomPayload {
