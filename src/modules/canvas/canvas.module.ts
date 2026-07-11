@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { AuditModule } from "../audit/audit.module";
@@ -43,7 +43,7 @@ import { CanvasSnapshotSerializer } from "./services/canvas-snapshot-serializer.
       WorkflowVersion,
     ]),
     AuditModule,
-    JobsModule,
+    forwardRef(() => JobsModule),
     OutboxModule,
     RealtimeModule,
     UsageModule,
@@ -63,6 +63,6 @@ import { CanvasSnapshotSerializer } from "./services/canvas-snapshot-serializer.
     CanvasAiSuggestionService,
     CanvasSnapshotSerializer,
   ],
-  exports: [CanvasService],
+  exports: [CanvasService, CanvasAiSuggestionService, CanvasRealtimeService],
 })
 export class CanvasModule {}

@@ -38,6 +38,20 @@ describe('AiTaskEventsService stale preview lineage', () => {
         allowedActions: ['ai.task.completed'],
       }),
     };
+    const suggestions = {
+      createOrUpdate: jest.fn(),
+      findByTaskId: jest.fn().mockResolvedValue(null),
+    };
+    const canvasRealtime = {
+      broadcastAiPreviewStarted: jest.fn(),
+      broadcastAiPreviewProgress: jest.fn(),
+      broadcastAiPreviewReady: jest.fn(),
+      broadcastAiPreviewStale: jest.fn(),
+      broadcastAiPreviewFailed: jest.fn(),
+      broadcastAiPreviewCancelled: jest.fn(),
+      broadcastAiPreviewAccepted: jest.fn(),
+      broadcastAiPreviewRejected: jest.fn(),
+    };
     const service = new AiTaskEventsService(
       tasks as never,
       db as never,
@@ -47,6 +61,8 @@ describe('AiTaskEventsService stale preview lineage', () => {
       audit as never,
       realtime as never,
       internalTokens as never,
+      suggestions as never,
+      canvasRealtime as never,
     );
 
     await service.handle('completed', {

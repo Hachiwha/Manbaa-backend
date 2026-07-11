@@ -17,6 +17,14 @@ import {
   CanvasSnapshotCreatedPayload,
   CanvasAiPreviewQueuedPayload,
   CanvasAiPreviewSupersededPayload,
+  CanvasAiPreviewStartedPayload,
+  CanvasAiPreviewProgressPayload,
+  CanvasAiPreviewReadyPayload,
+  CanvasAiPreviewStalePayload,
+  CanvasAiPreviewFailedPayload,
+  CanvasAiPreviewCancelledPayload,
+  CanvasAiPreviewAcceptedPayload,
+  CanvasAiPreviewRejectedPayload,
 } from "../../realtime/interfaces/ws-payloads.interface";
 
 const CURSOR_THROTTLE_MS = 50;
@@ -170,6 +178,38 @@ export class CanvasRealtimeService {
       WS_EVENTS.CANVAS_AI_PREVIEW_SUPERSEDED,
       payload,
     );
+  }
+
+  broadcastAiPreviewStarted(payload: CanvasAiPreviewStartedPayload): void {
+    this.emitCanvasEvent(payload.canvas_id, WS_EVENTS.CANVAS_AI_PREVIEW_STARTED, payload);
+  }
+
+  broadcastAiPreviewProgress(payload: CanvasAiPreviewProgressPayload): void {
+    this.emitCanvasEvent(payload.canvas_id, WS_EVENTS.CANVAS_AI_PREVIEW_PROGRESS, payload);
+  }
+
+  broadcastAiPreviewReady(payload: CanvasAiPreviewReadyPayload): void {
+    this.emitCanvasEvent(payload.canvas_id, WS_EVENTS.CANVAS_AI_PREVIEW_READY, payload);
+  }
+
+  broadcastAiPreviewStale(payload: CanvasAiPreviewStalePayload): void {
+    this.emitCanvasEvent(payload.canvas_id, WS_EVENTS.CANVAS_AI_PREVIEW_STALE, payload);
+  }
+
+  broadcastAiPreviewFailed(payload: CanvasAiPreviewFailedPayload): void {
+    this.emitCanvasEvent(payload.canvas_id, WS_EVENTS.CANVAS_AI_PREVIEW_FAILED, payload);
+  }
+
+  broadcastAiPreviewCancelled(payload: CanvasAiPreviewCancelledPayload): void {
+    this.emitCanvasEvent(payload.canvas_id, WS_EVENTS.CANVAS_AI_PREVIEW_CANCELLED, payload);
+  }
+
+  broadcastAiPreviewAccepted(payload: CanvasAiPreviewAcceptedPayload): void {
+    this.emitCanvasEvent(payload.canvas_id, WS_EVENTS.CANVAS_AI_PREVIEW_ACCEPTED, payload);
+  }
+
+  broadcastAiPreviewRejected(payload: CanvasAiPreviewRejectedPayload): void {
+    this.emitCanvasEvent(payload.canvas_id, WS_EVENTS.CANVAS_AI_PREVIEW_REJECTED, payload);
   }
 
   // ─── Cursor (throttled, ephemeral) ────────────────────────────────

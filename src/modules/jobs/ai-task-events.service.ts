@@ -4,7 +4,10 @@ import { DataSource, Repository } from 'typeorm';
 import { InternalServiceTokenService } from '../../core/internal-auth/internal-service-token.service';
 import { assertDomainEvent, DomainEvent } from '../../core/messaging/domain-event';
 import { NatsClientService } from '../../infra/nats/nats.client';
+import { CanvasAiPreviewStartedPayload, CanvasAiPreviewProgressPayload, CanvasAiPreviewFailedPayload, CanvasAiPreviewCancelledPayload, CanvasAiPreviewStalePayload } from '../realtime/interfaces/ws-payloads.interface';
 import { PlatformAuditService } from '../audit/platform-audit.service';
+import { CanvasRealtimeService } from '../canvas/services/canvas-realtime.service';
+import { CanvasAiSuggestionService } from '../canvas/services/canvas-ai-suggestion.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -13,6 +16,7 @@ import { AiTask, JobStatus } from './entities/ai-task.entity';
 
 type TaskEventPayload = Record<string, unknown> & {
   taskId: string; internalToken: string; progress?: number; currentStep?: string;
+  snapshotId?: string; snapshotVersion?: number; canvasRevision?: number;
   result?: Record<string, unknown>; errorCode?: string; errorMessage?: string; actualUsage?: number;
 };
 
@@ -27,6 +31,8 @@ export class AiTaskEventsService implements OnModuleInit {
     private readonly audit: PlatformAuditService,
     private readonly realtime: RealtimeGateway,
     private readonly internalTokens: InternalServiceTokenService,
+    private readonly suggestions: CanvasAiSuggestionService,
+    private readonly canvasRealtime: CanvasRealtimeService,
   ) {}
 
   async onModuleInit() {
@@ -50,15 +56,49 @@ export class AiTaskEventsService implements OnModuleInit {
     if (kind === 'started') {
       if (task.status !== JobStatus.QUEUED) return;
       task.status = JobStatus.RUNNING; task.startedAt = new Date(); task.currentStep = event.payload.currentStep ?? null; await this.tasks.save(task);
+      if (task.canvasId) {
+        this.canvasRealtime.broadcastAiPreviewStarted({
+          organization_id: task.organizationId,
+          workspace_id: task.workspaceId,
+          canvas_id: task.canvasId,
+          task_id: task.id,
+          snapshot_id: task.snapshotId ?? '',
+          snapshot_version: task.snapshotVersion ?? 0,
+          canvas_revision: Number(task.canvasRevision ?? 0),
+          current_step: event.payload.currentStep ?? 'started',
+        });
+      }
     } else if (kind === 'progress') {
       if (![JobStatus.RUNNING, JobStatus.WAITING_FOR_USER].includes(task.status)) return;
       task.progress = Math.max(task.progress, Math.min(99, event.payload.progress ?? task.progress)); task.currentStep = event.payload.currentStep ?? task.currentStep; await this.tasks.save(task);
+      if (task.canvasId) {
+        this.canvasRealtime.broadcastAiPreviewProgress({
+          organization_id: task.organizationId,
+          workspace_id: task.workspaceId,
+          canvas_id: task.canvasId,
+          task_id: task.id,
+          snapshot_id: task.snapshotId ?? '',
+          snapshot_version: task.snapshotVersion ?? 0,
+          canvas_revision: Number(task.canvasRevision ?? 0),
+          progress: task.progress,
+          current_step: task.currentStep ?? '',
+        });
+      }
     } else if (kind === 'cancelled') {
       if ([JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.STALE].includes(task.status)) return;
       await this.db.transaction(async manager => {
         task.status = JobStatus.CANCELLED; task.cancelledAt = new Date(); await manager.save(task);
         await this.usage.releaseUsage(task.usageReservationId, manager);
       });
+      if (task.canvasId) {
+        this.canvasRealtime.broadcastAiPreviewCancelled({
+          organization_id: task.organizationId,
+          workspace_id: task.workspaceId,
+          canvas_id: task.canvasId,
+          task_id: task.id,
+          snapshot_id: task.snapshotId ?? undefined,
+        });
+      }
     } else {
       const outcome = await this.finish(task, event, kind === 'completed');
       if (outcome === 'ignored') return;
@@ -71,8 +111,49 @@ export class AiTaskEventsService implements OnModuleInit {
           currentStep: 'stale_result_ignored',
         };
       }
+      if (kind === 'completed' && outcome === 'finished' && task.canvasId) {
+        await this.createSuggestionFromResult(task, event);
+      }
+      if (kind === 'failed' && outcome === 'finished' && task.canvasId) {
+        this.canvasRealtime.broadcastAiPreviewFailed({
+          organization_id: task.organizationId,
+          workspace_id: task.workspaceId,
+          canvas_id: task.canvasId,
+          task_id: task.id,
+          snapshot_id: task.snapshotId ?? undefined,
+          error_code: event.payload.errorCode ?? 'WORKER_FAILED',
+          error_message: event.payload.errorMessage ?? 'Worker task failed',
+        });
+      }
     }
     this.broadcast(task, broadcastEvent, broadcastPayload);
+  }
+
+  private async createSuggestionFromResult(task: AiTask, event: DomainEvent<TaskEventPayload>): Promise<void> {
+    const result = event.payload.result ?? {};
+    const componentSpec = result.componentSpec as Record<string, unknown> | undefined;
+    const assetId = result.assetId as string | undefined;
+    const assetVersionId = result.assetVersionId as string | undefined;
+    const enhancedPrompt = result.enhancedPrompt as string | undefined;
+    const evidenceIds = result.evidenceIds as string[] | undefined;
+
+    const resultType = componentSpec ? 'component' : assetId ? 'image' : 'unknown';
+
+    await this.suggestions.createOrUpdate({
+      taskId: task.id,
+      organizationId: task.organizationId,
+      workspaceId: task.workspaceId,
+      canvasId: task.canvasId ?? '',
+      snapshotId: task.snapshotId,
+      snapshotVersion: task.snapshotVersion,
+      canvasRevision: task.canvasRevision ? Number(task.canvasRevision) : null,
+      resultType,
+      componentSpec: componentSpec ?? null,
+      assetId: assetId ?? null,
+      assetVersionId: assetVersionId ?? null,
+      enhancedPrompt: enhancedPrompt ?? null,
+      evidenceIds: evidenceIds ?? null,
+    });
   }
 
   private async finish(
@@ -97,6 +178,16 @@ export class AiTaskEventsService implements OnModuleInit {
         after: { status: task.status },
         correlationId: event.correlationId,
       });
+      if (task.canvasId) {
+        this.canvasRealtime.broadcastAiPreviewStale({
+          organization_id: task.organizationId,
+          workspace_id: task.workspaceId,
+          canvas_id: task.canvasId,
+          task_id: task.id,
+          snapshot_id: task.snapshotId ?? '',
+          canvas_revision: Number(task.canvasRevision ?? 0),
+        });
+      }
       return 'stale';
     }
     if (

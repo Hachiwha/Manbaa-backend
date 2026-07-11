@@ -247,6 +247,68 @@ export interface CanvasAiPreviewSupersededPayload extends CanvasEventScope {
   canvas_revision: number;
 }
 
+export interface CanvasAiPreviewStartedPayload extends CanvasEventScope {
+  task_id: string;
+  snapshot_id: string;
+  snapshot_version: number;
+  canvas_revision: number;
+  current_step: string;
+}
+
+export interface CanvasAiPreviewProgressPayload extends CanvasEventScope {
+  task_id: string;
+  snapshot_id: string;
+  snapshot_version: number;
+  canvas_revision: number;
+  progress: number;
+  current_step: string;
+}
+
+export interface CanvasAiPreviewReadyPayload extends CanvasEventScope {
+  task_id: string;
+  suggestion_id: string;
+  snapshot_id: string;
+  snapshot_version: number;
+  canvas_revision: number;
+  result_type: string;
+}
+
+export interface CanvasAiPreviewStalePayload extends CanvasEventScope {
+  task_id: string;
+  snapshot_id: string;
+  canvas_revision: number;
+}
+
+export interface CanvasAiPreviewFailedPayload extends CanvasEventScope {
+  task_id: string;
+  snapshot_id?: string;
+  error_code: string;
+  error_message: string;
+}
+
+export interface CanvasAiPreviewCancelledPayload extends CanvasEventScope {
+  task_id: string;
+  snapshot_id?: string;
+}
+
+export interface CanvasAiPreviewAcceptedPayload extends CanvasEventScope {
+  task_id: string;
+  suggestion_id: string;
+  snapshot_id: string;
+  snapshot_version: number;
+  canvas_revision: number;
+  accepted_at: string;
+}
+
+export interface CanvasAiPreviewRejectedPayload extends CanvasEventScope {
+  task_id: string;
+  suggestion_id: string;
+  snapshot_id: string;
+  snapshot_version: number;
+  canvas_revision: number;
+  rejected_at: string;
+}
+
 // ─── Room join request ──────────────────────────────────────────────
 
 export interface JoinRoomPayload {

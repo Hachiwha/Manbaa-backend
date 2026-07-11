@@ -47,7 +47,15 @@ export const WS_EVENTS = {
   CANVAS_OPERATION_REJECTED: "canvas.operation.rejected",
   CANVAS_SNAPSHOT_CREATED: "canvas.snapshot.created",
   CANVAS_AI_PREVIEW_QUEUED: "canvas.ai.preview.queued",
+  CANVAS_AI_PREVIEW_STARTED: "canvas.ai.preview.started",
+  CANVAS_AI_PREVIEW_PROGRESS: "canvas.ai.preview.progress",
+  CANVAS_AI_PREVIEW_READY: "canvas.ai.preview.ready",
+  CANVAS_AI_PREVIEW_STALE: "canvas.ai.preview.stale",
+  CANVAS_AI_PREVIEW_FAILED: "canvas.ai.preview.failed",
+  CANVAS_AI_PREVIEW_CANCELLED: "canvas.ai.preview.cancelled",
   CANVAS_AI_PREVIEW_SUPERSEDED: "canvas.ai.preview.superseded",
+  CANVAS_AI_PREVIEW_ACCEPTED: "canvas.ai.preview.accepted",
+  CANVAS_AI_PREVIEW_REJECTED: "canvas.ai.preview.rejected",
 
   // Notification events
   NOTIFICATION_REVIEW_REQUEST: "notification.review_request",
