@@ -47,7 +47,6 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-
   app.useGlobalFilters(new HttpExceptionFilter(logger));
   app.useGlobalInterceptors(
     new CorrelationIdInterceptor(app.get(RequestContextService)),

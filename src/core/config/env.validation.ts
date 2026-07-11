@@ -26,6 +26,7 @@ export const envSchema = Joi.object({
   MINIO_USE_SSL: Joi.boolean().default(false),
   MINIO_ACCESS_KEY: Joi.string().required(),
   MINIO_SECRET_KEY: Joi.string().required(),
+  MINIO_BUCKET_ENCRYPTION_ENABLED: Joi.boolean().default(true),
   MINIO_BUCKET_NAME: Joi.string().default('documents'),
   MINIO_BUCKET_DOCUMENTS: Joi.string().default('documents'),
   MINIO_BUCKET_EXPORTS: Joi.string().default('exports'),

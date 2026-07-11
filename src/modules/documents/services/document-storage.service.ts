@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client } from 'minio';
 
@@ -16,12 +16,15 @@ interface StoreDocumentParams {
 
 @Injectable()
 export class DocumentStorageService {
+  private readonly logger = new Logger(DocumentStorageService.name);
   private readonly client: Client;
   private readonly bucketName: string;
+  private readonly encryptionEnabled: boolean;
   private bucketReadyPromise?: Promise<void>;
 
   constructor(private readonly configService: ConfigService) {
     this.bucketName = this.configService.getOrThrow<string>('minio.bucketDocuments');
+    this.encryptionEnabled = this.configService.get<boolean>('minio.bucketEncryptionEnabled') ?? true;
     this.client = new Client({
       endPoint: this.configService.getOrThrow<string>('minio.endpoint'),
       port: this.configService.getOrThrow<number>('minio.port'),
@@ -72,6 +75,11 @@ export class DocumentStorageService {
     const bucketExists = await this.client.bucketExists(this.bucketName);
     if (!bucketExists) {
       await this.client.makeBucket(this.bucketName);
+    }
+
+    if (!this.encryptionEnabled) {
+      this.logger.log('MinIO bucket encryption is disabled by configuration (MINIO_BUCKET_ENCRYPTION_ENABLED=false)');
+      return;
     }
 
     const encryptionConfig = {

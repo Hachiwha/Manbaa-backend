@@ -24,6 +24,7 @@ export default () => ({
     useSsl: process.env.MINIO_USE_SSL === 'true',
     accessKey: process.env.MINIO_ACCESS_KEY,
     secretKey: process.env.MINIO_SECRET_KEY,
+    bucketEncryptionEnabled: process.env.MINIO_BUCKET_ENCRYPTION_ENABLED !== 'false',
     bucketName: process.env.MINIO_BUCKET_NAME,
     bucketDocuments: process.env.MINIO_BUCKET_DOCUMENTS,
     bucketExports: process.env.MINIO_BUCKET_EXPORTS,
