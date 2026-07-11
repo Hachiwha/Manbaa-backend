@@ -1,9 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import { randomUUID } from 'crypto';
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import { randomUUID } from "crypto";
 
-import { RedisService } from '../../infra/redis/redis.service';
+import { RedisService } from "../../infra/redis/redis.service";
 
 export interface InternalServiceClaims {
   iss: string;
@@ -43,16 +43,19 @@ export class InternalServiceTokenService {
     config: ConfigService,
     private readonly redis: RedisService,
   ) {
-    this.issuer = config.get('internalAuth.issuer', 'nestjs-platform');
-    this.audience = config.get('internalAuth.audience', 'fastapi-workers');
-    this.current = config.getOrThrow('internalAuth.currentSecret');
-    this.previous = config.get('internalAuth.previousSecret');
-    this.services = new Set(config.get<string[]>('internalAuth.allowedServices', []));
-    this.tokenTtlSeconds = config.get('internalAuth.tokenTtlSeconds', 300);
+    this.issuer = config.get("internalAuth.issuer", "nestjs-platform");
+    this.audience = config.get("internalAuth.audience", "fastapi-workers");
+    this.current = config.getOrThrow("internalAuth.currentSecret");
+    this.previous = config.get("internalAuth.previousSecret");
+    this.services = new Set(
+      config.get<string[]>("internalAuth.allowedServices", []),
+    );
+    this.tokenTtlSeconds = config.get("internalAuth.tokenTtlSeconds", 300);
   }
 
   async create(input: CreateInternalTokenInput) {
-    if (!this.services.has(input.service)) throw new UnauthorizedException('Internal service not allowed');
+    if (!this.services.has(input.service))
+      throw new UnauthorizedException("Internal service not allowed");
     return this.jwt.signAsync(
       {
         jti: randomUUID(),
@@ -66,16 +69,18 @@ export class InternalServiceTokenService {
       {
         secret: this.current,
         issuer: this.issuer,
-        subject: 'nestjs-platform',
+        subject: "nestjs-platform",
         audience: this.audience,
         expiresIn: `${this.tokenTtlSeconds}s`,
       },
     );
   }
 
-  async validate(token: string, expectedAudience = this.audience) {
+  async verify(token: string, expectedAudience = this.audience) {
     let claims: InternalServiceClaims | undefined;
-    for (const secret of [this.current, this.previous].filter(Boolean) as string[]) {
+    for (const secret of [this.current, this.previous].filter(
+      Boolean,
+    ) as string[]) {
       try {
         claims = await this.jwt.verifyAsync<InternalServiceClaims>(token, {
           secret,
@@ -85,9 +90,21 @@ export class InternalServiceTokenService {
         break;
       } catch {}
     }
-    if (!claims || !this.services.has(claims.service)) throw new UnauthorizedException('Invalid internal service token');
-    if (!(await this.redis.markOnce('internal-auth', claims.jti, Math.max(1, claims.exp - Math.floor(Date.now() / 1000))))) {
-      throw new UnauthorizedException('Internal token replay detected');
+    if (!claims || !this.services.has(claims.service))
+      throw new UnauthorizedException("Invalid internal service token");
+    return claims;
+  }
+
+  async validate(token: string, expectedAudience = this.audience) {
+    const claims = await this.verify(token, expectedAudience);
+    if (
+      !(await this.redis.markOnce(
+        "internal-auth",
+        claims.jti,
+        Math.max(1, claims.exp - Math.floor(Date.now() / 1000)),
+      ))
+    ) {
+      throw new UnauthorizedException("Internal token replay detected");
     }
     return claims;
   }
