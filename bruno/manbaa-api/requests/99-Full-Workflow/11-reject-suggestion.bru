@@ -1,0 +1,18 @@
+meta {
+  name: 11 - Reject Suggestion
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/canvases/{{canvasId}}/suggestions/{{suggestionId}}/reject
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 201
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Update Workspace
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body {
+  {
+    "name": "Manbaa Dev Workspace Updated",
+    "version": 1
+  }
+}
+
+assert {
+  res.status: eq 200
+}

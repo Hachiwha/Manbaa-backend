@@ -1,0 +1,18 @@
+meta {
+  name: 404 Unknown Workspace
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/workspaces/00000000-0000-0000-0000-000000000000
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 404
+}

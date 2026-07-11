@@ -1,0 +1,23 @@
+meta {
+  name: 403 Viewer Forbidden
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/sources
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+body:multipart {
+  file: @file(../fixtures/brand-guide.md)
+}
+
+# Note: This test assumes a viewer-role token is available
+# If the current user is not a viewer, this may return 201 instead
+assert {
+  res.status: eq 403
+}

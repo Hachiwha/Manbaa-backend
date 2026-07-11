@@ -1,0 +1,98 @@
+name: Bruno API Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "bruno/**"
+      - "src/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "bruno/**"
+      - "src/**"
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_FILE: docker-compose.yml
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start Docker stack
+        run: |
+          ./scripts/dev-up.sh
+          echo "Waiting for services to be healthy..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost/api/health/ready > /dev/null 2>&1; then
+              echo "Backend is ready"
+              break
+            fi
+            echo "Attempt $i: waiting..."
+            sleep 5
+          done
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Bruno CLI
+        run: npm install -g @usebruno/cli
+
+      - name: Run Health Checks
+        run: |
+          bru run bruno/manbaa-api/requests/00-Health --env docker
+
+      - name: Run Auth Tests
+        run: |
+          bru run bruno/manbaa-api/requests/01-Auth --env docker
+
+      - name: Run Organization Tests
+        run: |
+          bru run bruno/manbaa-api/requests/02-Organizations --env docker
+
+      - name: Run Workspace Tests
+        run: |
+          bru run bruno/manbaa-api/requests/03-Workspaces --env docker
+
+      - name: Run Session Tests
+        run: |
+          bru run bruno/manbaa-api/requests/05-Sessions --env docker
+
+      - name: Run Source Tests
+        run: |
+          bru run bruno/manbaa-api/requests/06-Sources --env docker
+
+      - name: Run Application Tests
+        run: |
+          bru run bruno/manbaa-api/requests/11-Applications --env docker
+
+      - name: Run Negative Tests
+        run: |
+          bru run bruno/manbaa-api/requests/90-Negative-Tests --env docker
+
+      - name: Run Full Workflow
+        if: success()
+        run: |
+          bru run bruno/manbaa-api/requests/99-Full-Workflow --env docker --output bruno-report.json
+
+      - name: Upload Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bruno-report
+          path: bruno-report*.json
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

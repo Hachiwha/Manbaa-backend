@@ -1,0 +1,25 @@
+meta {
+  name: 400 Unknown Field Rejected
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/organizations
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body {
+  {
+    "name": "Test",
+    "unknown_field": "should be rejected"
+  }
+}
+
+assert {
+  res.status: eq 400
+}

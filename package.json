@@ -29,7 +29,10 @@
     "migration:revert": "pnpm typeorm migration:revert",
     "db:reset": "pnpm typeorm schema:drop && pnpm migration:run",
     "db:seed": "ts-node src/database/seed.ts",
-    "db:reseed": "pnpm db:reset && pnpm db:seed"
+    "db:reseed": "pnpm db:reset && pnpm db:seed",
+    "bruno:test": "npx @usebruno/cli run bruno/manbaa-api --env local",
+    "bruno:docker": "npx @usebruno/cli run bruno/manbaa-api --env docker",
+    "bruno:openapi": "npx @usebruno/cli run bruno/manbaa-api --env local --output bruno-report.json"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",

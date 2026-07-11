@@ -1,0 +1,32 @@
+meta {
+  name: 05 - Poll Source Until Indexed
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/sources/{{sourceId}}
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+script.pre-request {
+  const MAX_ATTEMPTS = 30;
+  const attempts = parseInt(bru.getVar('pollAttempts') || '0');
+  if (attempts >= MAX_ATTEMPTS) {
+    throw new Error('Source did not reach terminal status within max attempts');
+  }
+  bru.setVar('pollAttempts', String(attempts + 1));
+}
+
+script.post-response {
+  const status = res.body ? res.body.status : null;
+  if (status === 'INDEXED') {
+    bru.setVar('sourcePollDone', 'true');
+  } else if (['FAILED', 'ERROR'].includes(status)) {
+    throw new Error('Source processing failed with status: ' + status);
+  }
+}

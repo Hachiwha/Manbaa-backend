@@ -1,0 +1,18 @@
+meta {
+  name: Accept Suggestion
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/canvases/{{canvasId}}/suggestions/{{suggestionId}}/accept
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 201
+}

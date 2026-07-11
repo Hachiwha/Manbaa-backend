@@ -1,0 +1,29 @@
+meta {
+  name: Create Application Version
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/v1/projects/{{projectId}}/applications/{{applicationId}}/versions
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "v1.0.0",
+    "schema": {
+      "nodes": [],
+      "edges": []
+    }
+  }
+}
+
+assert {
+  res.status: eq 201
+}

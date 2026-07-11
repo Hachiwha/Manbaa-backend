@@ -1,0 +1,27 @@
+meta {
+  name: Create Message
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/sessions/{{sessionId}}/messages
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "content": "Tell me about the workflow",
+    "role": "user"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.data.id: isPresent
+}

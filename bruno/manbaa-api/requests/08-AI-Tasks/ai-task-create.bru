@@ -1,0 +1,35 @@
+meta {
+  name: Create AI Task
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/ai/tasks
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body {
+  {
+    "taskType": "generate_component",
+    "payload": {
+      "prompt": "Create a professional cybersecurity hero section",
+      "sourceIds": ["{{sourceId}}"]
+    }
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isDefined
+}
+
+script.post-response {
+  if (res.status === 201 && res.body.id) {
+    bru.setEnvVar('taskId', res.body.id);
+  }
+}

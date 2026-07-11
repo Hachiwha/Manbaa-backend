@@ -1,0 +1,18 @@
+meta {
+  name: List AI Tasks
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/ai/tasks
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+}

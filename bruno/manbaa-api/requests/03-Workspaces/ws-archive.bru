@@ -1,0 +1,18 @@
+meta {
+  name: Archive Workspace
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/archive
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 201
+}

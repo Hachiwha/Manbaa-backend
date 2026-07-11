@@ -1,0 +1,34 @@
+meta {
+  name: 08 - Request Image Generation
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/canvases/{{canvasId}}/ai-preview
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+  Idempotency-Key: {{idempotencyKey}}-img
+}
+
+body {
+  {
+    "operation": "generate_image",
+    "user_prompt": "A modern cybersecurity dashboard interface with navy blue and cyan theme",
+    "selected_element_ids": [],
+    "locked_element_ids": [],
+    "editable_element_ids": [],
+    "source_ids": ["{{sourceId}}"],
+    "desired_width": 1200,
+    "desired_height": 720,
+    "auto_apply": false
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.taskId: isDefined
+}

@@ -1,0 +1,28 @@
+meta {
+  name: Logout
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/logout
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+assert {
+  res.status: eq 204
+}
+
+script.post-response {
+  bru.setEnvVar('accessToken', '');
+  bru.setEnvVar('refreshToken', '');
+}

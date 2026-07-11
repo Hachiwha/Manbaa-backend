@@ -1,0 +1,31 @@
+meta {
+  name: Upload Source
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/sources
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+body:multipart {
+  file: @file(../fixtures/brand-guide.md)
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isDefined
+  res.body.versionId: isDefined
+  res.body.status: isDefined
+}
+
+script.post-response {
+  if (res.status === 201) {
+    if (res.body.id) bru.setEnvVar('sourceId', res.body.id);
+    if (res.body.versionId) bru.setEnvVar('sourceVersionId', res.body.versionId);
+  }
+}

@@ -1,0 +1,18 @@
+meta {
+  name: 401 Invalid Token
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/auth/me
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer invalid-token-that-is-at-least-32-chars-long-because-test
+}
+
+assert {
+  res.status: eq 401
+}

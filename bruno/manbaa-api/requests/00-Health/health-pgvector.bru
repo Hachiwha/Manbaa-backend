@@ -1,0 +1,18 @@
+meta {
+  name: PG Vector (Admin)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/health/pgvector
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+}

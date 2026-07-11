@@ -1,0 +1,19 @@
+meta {
+  name: List Snapshots
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/workflows/{{workflowId}}/canvas/snapshots
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}

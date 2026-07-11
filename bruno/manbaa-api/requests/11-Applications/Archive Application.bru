@@ -1,0 +1,19 @@
+meta {
+  name: Archive Application
+  type: http
+  seq: 14
+}
+
+delete {
+  url: {{baseUrl}}/v1/projects/{{projectId}}/applications/{{applicationId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+assert {
+  res.status: eq 200
+}

@@ -1,0 +1,32 @@
+meta {
+  name: 03 - Create Workspace
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces?organizationId={{organizationId}}
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body {
+  {
+    "name": "Bruno Test WS {{orgSuffix}}",
+    "description": "Created by Bruno E2E runner"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isDefined
+}
+
+script.post-response {
+  if (res.body.id) {
+    bru.setEnvVar('workspaceId', res.body.id);
+  }
+}

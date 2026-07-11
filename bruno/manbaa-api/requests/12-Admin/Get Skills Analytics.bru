@@ -1,0 +1,19 @@
+meta {
+  name: Get Skills Analytics (Admin)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/admin/skills/analytics
+  body: none
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+assert {
+  res.status: eq 200
+}

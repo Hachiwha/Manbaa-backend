@@ -1,0 +1,525 @@
+openapi: 3.0.3
+info:
+  title: Manbaa API
+  description: |
+    Manbaa — AI-powered process elicitation and workflow management platform.
+    This OpenAPI specification is a companion to the Bruno API collection.
+    For the authoritative spec, run the backend and visit /api/docs-json.
+  version: "1.0"
+  contact:
+    name: Manbaa Team
+servers:
+  - url: http://localhost:3000/api
+    description: Local development
+  - url: http://localhost/api
+    description: Docker (via Caddy reverse proxy)
+  - url: https://api.manbaa.example.com/api
+    description: Production (example)
+tags:
+  - name: Health
+  - name: Auth
+  - name: Organizations
+  - name: Workspaces
+  - name: Projects
+  - name: Sessions
+  - name: Session Messages
+  - name: Sources
+  - name: Canvas
+  - name: AI Tasks
+  - name: Suggestions
+  - name: Assets
+  - name: Applications
+  - name: Admin
+paths:
+  # ── Health ──
+  /health/ping:
+    get:
+      summary: Ping
+      tags: [Health]
+      responses:
+        "200":
+          description: OK
+  /health/live:
+    get:
+      summary: Liveness probe
+      tags: [Health]
+      responses:
+        "200":
+          description: OK
+  /health/ready:
+    get:
+      summary: Readiness probe
+      tags: [Health]
+      responses:
+        "200":
+          description: OK
+  /health:
+    get:
+      summary: Aggregate health
+      tags: [Health]
+      responses:
+        "200":
+          description: OK
+  # ── Auth ──
+  /v1/auth/register:
+    post:
+      summary: Register
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "201":
+          description: Created
+  /v1/auth/login:
+    post:
+      summary: Login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: OK
+  /v1/auth/me:
+    get:
+      summary: Get current user
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  # ── Organizations ──
+  /v1/organizations:
+    post:
+      summary: Create organization
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List organizations
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  # ── Workspaces ──
+  /v1/workspaces:
+    post:
+      summary: Create workspace
+      tags: [Workspaces]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: organizationId
+          in: query
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List workspaces
+      tags: [Workspaces]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  # ── Sessions ──
+  /v1/sessions:
+    post:
+      summary: Create session
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                workspaceId:
+                  type: string
+                name:
+                  type: string
+      responses:
+        "201":
+          description: Created
+  /v1/sessions/{id}:
+    get:
+      summary: Get session
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Archive session
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/sessions/workflow/{workflowId}:
+    get:
+      summary: Get session by workflow
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/sessions/{id}/mode:
+    patch:
+      summary: Update session mode
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/sessions/{id}/finalize:
+    post:
+      summary: Finalize session
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: OK
+  /v1/sessions/{id}/workflow-state:
+    get:
+      summary: Get workflow state
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/sessions/{id}/progress:
+    get:
+      summary: Get session progress
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/sessions/{id}/status:
+    patch:
+      summary: Override session status (admin)
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  # ── Session Messages ──
+  /v1/sessions/{sessionId}/messages:
+    post:
+      summary: Create message
+      tags: [Session Messages]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List messages
+      tags: [Session Messages]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/sessions/{sessionId}/messages/export:
+    get:
+      summary: Export messages
+      tags: [Session Messages]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  # ── Sources ──
+  /v1/workspaces/{workspaceId}/sources:
+    post:
+      summary: Upload source
+      tags: [Sources]
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List sources
+      tags: [Sources]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  # ── AI Tasks ──
+  /v1/workspaces/{workspaceId}/ai/tasks:
+    post:
+      summary: Create AI task
+      tags: [AI Tasks]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List AI tasks
+      tags: [AI Tasks]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/workspaces/{workspaceId}/ai/tasks/{taskId}:
+    get:
+      summary: Get AI task
+      tags: [AI Tasks]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/workspaces/{workspaceId}/ai/tasks/{taskId}/cancel:
+    post:
+      summary: Cancel AI task
+      tags: [AI Tasks]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: OK
+  # ── Suggestions ──
+  /v1/workspaces/{workspaceId}/canvases/{canvasId}/suggestions:
+    get:
+      summary: List suggestions
+      tags: [Suggestions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/workspaces/{workspaceId}/canvases/{canvasId}/suggestions/{id}/accept:
+    post:
+      summary: Accept suggestion
+      tags: [Suggestions]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: OK
+  /v1/workspaces/{workspaceId}/canvases/{canvasId}/suggestions/{id}/reject:
+    post:
+      summary: Reject suggestion
+      tags: [Suggestions]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: OK
+  # ── Assets ──
+  /v1/workspaces/{workspaceId}/assets:
+    get:
+      summary: List assets
+      tags: [Assets]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/workspaces/{workspaceId}/assets/{assetId}:
+    get:
+      summary: Get asset
+      tags: [Assets]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/workspaces/{workspaceId}/assets/{assetId}/download-url:
+    get:
+      summary: Get download URL
+      tags: [Assets]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  # ── Applications ──
+  /v1/projects/{projectId}/applications:
+    post:
+      summary: Create application
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List applications
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/projects/{projectId}/applications/{id}:
+    get:
+      summary: Get application
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+    patch:
+      summary: Update application
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Archive application
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/projects/{projectId}/applications/{id}/schema:
+    post:
+      summary: Save draft schema
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: OK
+    get:
+      summary: Get draft schema
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/projects/{projectId}/applications/{id}/versions:
+    post:
+      summary: Create version
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List versions
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/projects/{projectId}/applications/{id}/versions/{versionId}:
+    get:
+      summary: Get version
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/projects/{projectId}/applications/{id}/publish:
+    post:
+      summary: Publish version
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: OK
+  /v1/projects/{projectId}/applications/{id}/published:
+    get:
+      summary: Get published version
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/projects/{projectId}/applications/{id}/duplicate:
+    post:
+      summary: Duplicate application
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created
+  /v1/projects/{projectId}/applications/{id}/unpublish:
+    post:
+      summary: Unpublish application
+      tags: [Applications]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: OK
+  # ── Admin ──
+  /v1/admin/skills/analytics:
+    get:
+      summary: Get skills analytics
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -1,0 +1,18 @@
+meta {
+  name: AI Service (Admin)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/health/ai-service
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+}

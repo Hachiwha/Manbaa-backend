@@ -1,0 +1,19 @@
+meta {
+  name: Unpublish Application
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/v1/projects/{{projectId}}/applications/{{applicationId}}/unpublish
+  body: none
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+assert {
+  res.status: eq 201
+}

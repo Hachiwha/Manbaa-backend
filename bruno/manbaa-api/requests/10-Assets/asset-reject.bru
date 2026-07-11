@@ -1,0 +1,18 @@
+meta {
+  name: Reject Asset
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/assets/{{assetId}}/reject
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 201
+}

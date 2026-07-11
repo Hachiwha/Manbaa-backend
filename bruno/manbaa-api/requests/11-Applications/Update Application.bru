@@ -1,0 +1,25 @@
+meta {
+  name: Update Application
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/v1/projects/{{projectId}}/applications/{{applicationId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Updated Application"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

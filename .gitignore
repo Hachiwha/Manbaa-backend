@@ -43,3 +43,8 @@ Thumbs.db
 # Codex / Tooling
 .codex/
 .codex
+
+# Bruno API collection
+bruno-report*.json
+bruno/manbaa-api/**/.bru-internal.json
+.tmp-bruno-*

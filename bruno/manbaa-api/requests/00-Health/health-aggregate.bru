@@ -1,0 +1,18 @@
+meta {
+  name: Aggregate Health
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/health
+}
+
+headers {
+  Content-Type: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq ok
+}

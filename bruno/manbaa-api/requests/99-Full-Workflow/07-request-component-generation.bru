@@ -1,0 +1,40 @@
+meta {
+  name: 07 - Request Component Generation
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/canvases/{{canvasId}}/ai-preview
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+  Idempotency-Key: {{idempotencyKey}}
+}
+
+body {
+  {
+    "operation": "generate_component",
+    "user_prompt": "Create a professional cybersecurity hero section",
+    "selected_element_ids": [],
+    "locked_element_ids": [],
+    "editable_element_ids": [],
+    "source_ids": ["{{sourceId}}"],
+    "desired_width": 1200,
+    "desired_height": 720,
+    "auto_apply": false
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.taskId: isDefined
+}
+
+script.post-response {
+  if (res.body.taskId) {
+    bru.setEnvVar('taskId', res.body.taskId);
+  }
+}

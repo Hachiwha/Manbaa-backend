@@ -1,0 +1,31 @@
+meta {
+  name: 02 - Create Organization
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/organizations
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body {
+  {
+    "name": "Bruno Test Org {{orgSuffix}}"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isDefined
+}
+
+script.post-response {
+  if (res.body.id) {
+    bru.setEnvVar('organizationId', res.body.id);
+  }
+}

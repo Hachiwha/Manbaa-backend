@@ -1,0 +1,24 @@
+meta {
+  name: Get Or Create Canvas
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/workflows/{{workflowId}}/canvas
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+}
+
+script.post-response {
+  if (res.status === 200 && res.body.id) {
+    bru.setEnvVar('canvasId', res.body.id);
+  }
+}

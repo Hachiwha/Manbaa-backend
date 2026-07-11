@@ -1,0 +1,25 @@
+meta {
+  name: 409 Stale Revision
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body {
+  {
+    "name": "Stale Revision Test",
+    "version": 999
+  }
+}
+
+assert {
+  res.status: eq 409
+}

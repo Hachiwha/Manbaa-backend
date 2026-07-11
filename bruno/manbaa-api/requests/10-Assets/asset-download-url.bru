@@ -1,0 +1,19 @@
+meta {
+  name: Get Download URL
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/assets/{{assetId}}/download-url
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.url: isDefined
+}

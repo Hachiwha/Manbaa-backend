@@ -1,0 +1,27 @@
+meta {
+  name: Update Canvas Object
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/canvas/objects/{{objectId}}
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body {
+  {
+    "label": "Hisn Updated",
+    "properties": {
+      "text": "Hisn - Collaborative Security"
+    }
+  }
+}
+
+assert {
+  res.status: eq 200
+}

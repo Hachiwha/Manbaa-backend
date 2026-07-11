@@ -1,0 +1,18 @@
+meta {
+  name: Duplicate Workspace
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/v1/workspaces/{{workspaceId}}/duplicate
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 201
+}

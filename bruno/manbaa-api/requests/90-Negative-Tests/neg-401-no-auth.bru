@@ -1,0 +1,17 @@
+meta {
+  name: 401 Unauthenticated
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/auth/me
+}
+
+headers {
+  Content-Type: application/json
+}
+
+assert {
+  res.status: eq 401
+}

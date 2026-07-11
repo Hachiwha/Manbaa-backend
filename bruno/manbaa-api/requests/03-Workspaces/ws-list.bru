@@ -1,0 +1,19 @@
+meta {
+  name: List Workspaces
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/workspaces
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Create Canvas Snapshot
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/workflows/{{workflowId}}/canvas/snapshots
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body {
+  {
+    "trigger": "manual"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isDefined
+}
