@@ -41,9 +41,6 @@ export class CanvasAiPreviewRequestDto {
   @MinLength(1)
   @MaxLength(MAX_AI_PREVIEW_PROMPT_LENGTH)
   @Matches(/\S/, { message: 'user_prompt must not be blank' })
-  @Matches(/^[^\u0000]*$/, {
-    message: 'user_prompt must not contain null bytes',
-  })
   user_prompt: string;
 
   @ApiProperty({ type: [String], maxItems: MAX_AI_PREVIEW_ELEMENT_IDS })

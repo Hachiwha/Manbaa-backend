@@ -15,6 +15,7 @@ export const SUBJECTS_V2 = {
   AI_TASK_COMPLETED: 'workspace.ai.task.completed',
   AI_TASK_FAILED: 'workspace.ai.task.failed',
   AI_TASK_CANCEL_REQUESTED: 'workspace.ai.task.cancel.requested',
+  AI_TASK_CANCELLED: 'workspace.ai.task.cancelled',
 
   // Source / Document processing
   SOURCE_PROCESS_REQUESTED: 'workspace.source.process.requested',

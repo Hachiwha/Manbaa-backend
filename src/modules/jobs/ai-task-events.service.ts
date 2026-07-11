@@ -30,7 +30,7 @@ export class AiTaskEventsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    for (const type of ['started', 'progress', 'completed', 'failed']) {
+    for (const type of ['started', 'progress', 'completed', 'failed', 'cancelled']) {
       await this.nats.subscribeDurable({ subject: `workspace.ai.task.${type}`, durableName: `nestjs-workspace-ai-${type}`, handler: event => this.handle(type, event) });
     }
   }
@@ -53,6 +53,12 @@ export class AiTaskEventsService implements OnModuleInit {
     } else if (kind === 'progress') {
       if (![JobStatus.RUNNING, JobStatus.WAITING_FOR_USER].includes(task.status)) return;
       task.progress = Math.max(task.progress, Math.min(99, event.payload.progress ?? task.progress)); task.currentStep = event.payload.currentStep ?? task.currentStep; await this.tasks.save(task);
+    } else if (kind === 'cancelled') {
+      if ([JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.STALE].includes(task.status)) return;
+      await this.db.transaction(async manager => {
+        task.status = JobStatus.CANCELLED; task.cancelledAt = new Date(); await manager.save(task);
+        await this.usage.releaseUsage(task.usageReservationId, manager);
+      });
     } else {
       const outcome = await this.finish(task, event, kind === 'completed');
       if (outcome === 'ignored') return;

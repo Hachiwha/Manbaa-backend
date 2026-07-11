@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "schemaVersion": 1,
   "subjects": [
-    "workspace.ai.task.requested", "workspace.ai.task.started", "workspace.ai.task.progress", "workspace.ai.task.completed", "workspace.ai.task.failed", "workspace.ai.task.cancel.requested",
+    "workspace.ai.task.requested", "workspace.ai.task.started", "workspace.ai.task.progress", "workspace.ai.task.completed", "workspace.ai.task.failed", "workspace.ai.task.cancel.requested", "workspace.ai.task.cancelled",
     "workspace.source.process.requested", "workspace.source.processing", "workspace.source.extracted", "workspace.source.indexed", "workspace.source.failed",
     "workspace.research.requested", "workspace.research.progress", "workspace.research.completed", "workspace.research.failed",
     "workspace.canvas.analyze.requested", "workspace.canvas.analysis.completed",

@@ -87,14 +87,19 @@ export class CanvasAiPreviewCoordinator {
     const dueAt = Math.min(now + this.debounceMs, maxDueAt);
     const reason = dueAt === maxDueAt ? 'max_debounce' : 'debounce';
 
-    let pending: PendingPreview;
-    const timer = this.clock.setTimeout(() => {
+    const pending: PendingPreview = {
+      timer: null as unknown as ReturnType<typeof setTimeout>,
+      firstEditAt,
+      dueAt,
+      revision,
+      handler,
+    };
+    pending.timer = this.clock.setTimeout(() => {
       if (this.pending.get(canvasId) !== pending) return;
       this.pending.delete(canvasId);
       void this.invoke(handler, { canvasId, revision, reason });
     }, Math.max(0, dueAt - now));
 
-    pending = { timer, firstEditAt, dueAt, revision, handler };
     this.pending.set(canvasId, pending);
     return { scheduled: true, dueAt };
   }
